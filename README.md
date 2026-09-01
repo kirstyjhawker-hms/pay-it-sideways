@@ -58,7 +58,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-The 29 automated tests cover exact Luna parsing/storage, gift-key validation, Nimiq network mapping, device-local link recovery, storage-failure protection, opt-in analytics consent, CSP drift protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, fabricated-payment and raw-relay rejection, interrupted claim recovery, rebroadcast, and post-chain confirmation. The message-only UI, recent-link recovery, analytics preference, and Nimiq WebAssembly under production CSP are also verified through mobile-sized browser runs. Final release acceptance includes a real Testnet Send → Claim → Pass run inside Nimiq Pay.
+The 29 automated tests cover exact Luna parsing/storage, gift-key validation, Nimiq network mapping, device-local link recovery, storage-failure protection, opt-in analytics consent, CSP drift protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, fabricated-payment and raw-relay rejection, interrupted claim recovery, rebroadcast, and post-chain confirmation. The message-only UI, recent-link recovery, analytics preference, and Nimiq WebAssembly under production CSP are also verified through mobile-sized browser runs. Release acceptance included a real Testnet Send → Claim → Pass run and native share/copy inside Nimiq Pay.
 
 ## Deployment
 

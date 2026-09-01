@@ -59,10 +59,10 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Funding and claim records are verified against the blockchain
 - [x] Mobile widths, tap targets, focus states, and reduced motion checked
 - [x] 29 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
-- [ ] Real Testnet Send → Claim → Pass rerun in the current Nimiq Pay build
+- [x] Real Testnet Send → Claim → Pass rerun in the current Nimiq Pay build
 - [x] Cloudflare authentication, D1 creation/migration, and production deployment
 - [x] Public GitHub repository published and URL inserted above
-- [ ] Production link tested inside Nimiq Pay, including native share/copy
+- [x] Production link tested inside Nimiq Pay, including native share/copy
 - [x] Icon, thumbnail, and four final screenshots prepared in `submission-assets/`
 - [ ] Optional video recorded and uploaded
 - [ ] Contact email, confirmed GitHub login, and personal payout NIM address entered

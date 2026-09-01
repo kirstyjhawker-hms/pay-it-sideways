@@ -1,0 +1,34 @@
+{
+  "name": "pay-it-sideways",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "wrangler dev --port 8787",
+    "db:migrate:local": "wrangler d1 migrations apply pay-it-sideways --local",
+    "db:migrate:remote": "wrangler d1 migrations apply pay-it-sideways --remote",
+    "build": "vue-tsc -b && vite build",
+    "typecheck": "vue-tsc -b --pretty false",
+    "typecheck:worker": "tsc -p tsconfig.worker.json --noEmit",
+    "test": "vitest run",
+    "preview": "vite preview --host 0.0.0.0",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@nimiq/core": "^2.21.0",
+    "@nimiq/mini-app-sdk": "0.1.0",
+    "vue": "3.5.21",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260901.1",
+    "@vitejs/plugin-vue": "6.0.1",
+    "typescript": "5.9.2",
+    "vite": "7.3.6",
+    "vitest": "^4.1.11",
+    "vue-tsc": "3.0.6",
+    "wrangler": "^4.127.1"
+  }
+}

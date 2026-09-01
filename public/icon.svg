@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Pay It Sideways</title>
+  <rect width="512" height="512" rx="116" fill="#f8f4e8"/>
+  <path d="M101 332c42-72 99-113 171-123 51-7 96 3 139 31" fill="none" stroke="#356154" stroke-width="30" stroke-linecap="round"/>
+  <path d="m353 166 69 77-100 22" fill="none" stroke="#356154" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M92 362c-14-34-1-76 32-94 31-17 70-8 91 18 21-26 60-35 91-18 33 18 46 60 32 94-19 46-74 75-123 105-49-30-104-59-123-105Z" fill="#f5c84c"/>
+</svg>

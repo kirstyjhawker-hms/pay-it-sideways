@@ -17,7 +17,7 @@
 
 ## Description (under 250 words)
 
-Pay It Sideways turns a private note of appreciation into an invitation—not an obligation—to create another kind moment.
+Pay It Sideways begins with a three-beat story: think of one person, send one private link, and let them choose what follows. It turns a private note of appreciation into an invitation—not an obligation—to create another kind moment.
 
 A sender answers two simple prompts, then sends their own genuine words. They can optionally add a small NIM gift through Nimiq Pay, but “Words are enough” is the default and is treated as a complete experience. The sender never needs the recipient’s wallet address: one private link carries both the note and, when present, a one-use claimable NIM gift.
 
@@ -33,8 +33,8 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 
 ## 60-second walkthrough
 
-1. Open Pay It Sideways inside Nimiq Pay; point out “Money is optional.”
-2. Tap **Send some kindness** and answer the two prompts.
+1. Open Pay It Sideways inside Nimiq Pay; let the three-beat story establish person → private link → choice.
+2. Tap **Start with someone** and answer the two prompts.
 3. Choose **Add a little NIM**, select 0.5 NIM, and show the native confirmation.
 4. Share the resulting private link to a second device/account.
 5. Open it and show the message, attached NIM, and “nothing you need to do.”

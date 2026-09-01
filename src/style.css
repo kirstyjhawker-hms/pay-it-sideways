@@ -92,8 +92,9 @@ input:focus-visible {
   flex: 1;
 }
 
-.home-screen { display: flex; align-items: center; }
+.home-screen { display: flex; align-items: flex-start; padding-top: 20px; }
 .home-copy { width: min(100%, 570px); margin: auto; }
+.home-copy h1 { max-width: 12ch; font-size: clamp(2.2rem, 9.8vw, 4.35rem); }
 .centered-screen { display: grid; place-items: center; }
 
 .eyebrow {
@@ -125,6 +126,42 @@ h1 {
 
 .lead { margin: 24px 0 30px; font-size: 1rem; }
 .supporting { margin: 14px 0 28px; }
+
+.home-copy .lead { margin: 18px 0 22px; }
+
+.story-beats {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+}
+
+.story-beats li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 11px;
+  align-items: center;
+  padding: 11px 13px 11px 11px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 253, 248, 0.58);
+}
+
+.story-number {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--leaf-dark);
+  background: rgba(53, 97, 84, 0.1);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.story-beats strong { font-size: 0.88rem; }
+.story-beats p { margin: 3px 0 0; color: var(--muted); font-size: 0.76rem; line-height: 1.42; }
 
 .button {
   display: inline-flex;

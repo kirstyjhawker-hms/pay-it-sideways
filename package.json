@@ -15,7 +15,7 @@
     "test": "vitest run --configLoader runner",
     "test:unit": "vitest run --configLoader runner --project unit",
     "test:worker": "vitest run --configLoader runner --project worker",
-    "preview": "vite preview --host 0.0.0.0",
+    "preview": "vite preview --configLoader runner --host 0.0.0.0",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

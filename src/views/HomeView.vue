@@ -35,15 +35,29 @@ onMounted(async () => {
     </div>
 
     <section class="home-copy" aria-labelledby="home-heading">
-      <p class="eyebrow">A note can travel further than you think.</p>
-      <h1 id="home-heading">Make someone’s day a little brighter.</h1>
+      <p class="eyebrow">One kind moment can start another.</p>
+      <h1 id="home-heading">It starts with someone who showed up.</h1>
       <p class="lead">
-        Send a genuine note of appreciation. Add a little NIM if you want to.
-        Money is optional. Kindness isn’t.
+        Pay It Sideways turns something you appreciate into a private story they get to continue—or simply keep.
       </p>
 
+      <ol class="story-beats" aria-label="How Pay It Sideways works">
+        <li>
+          <span class="story-number" aria-hidden="true">1</span>
+          <div><strong>Think of one person.</strong><p>Write the thing you appreciate but do not always say.</p></div>
+        </li>
+        <li>
+          <span class="story-number" aria-hidden="true">2</span>
+          <div><strong>Send one private link.</strong><p>Words are enough. Add NIM if you want—no wallet address needed.</p></div>
+        </li>
+        <li>
+          <span class="story-number" aria-hidden="true">3</span>
+          <div><strong>They choose what follows.</strong><p>Keep it, claim it, or pass fresh kindness to someone else.</p></div>
+        </li>
+      </ol>
+
       <RouterLink class="button button--primary button--wide" to="/create" @click="track('create_started')">
-        Send some kindness <span aria-hidden="true">→</span>
+        Start with someone <span aria-hidden="true">→</span>
       </RouterLink>
       <RouterLink v-if="hasSentLinks" class="recent-link" to="/history">Reopen a recent private link</RouterLink>
 

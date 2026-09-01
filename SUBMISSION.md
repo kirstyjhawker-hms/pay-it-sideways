@@ -8,7 +8,7 @@
 | Category | Social |
 | Tagline | Someone showed up for you. Show up for someone else. |
 | Pricing | Free |
-| Repository | Add public GitHub URL after publishing |
+| Repository | https://github.com/kirstyjhawker-hms/pay-it-sideways |
 | Demo | Add production HTTPS URL after deployment |
 | Video | Add walkthrough URL if recorded |
 | GitHub login | `kirstyjhawker-hms` |
@@ -61,7 +61,7 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Unit tests, type checks, production build, and dependency audit pass
 - [ ] Real Testnet Send → Claim → Pass rerun in the current Nimiq Pay build
 - [ ] Cloudflare authentication, D1 creation/migration, and production deployment
-- [ ] Public GitHub repository published and URL inserted above
+- [x] Public GitHub repository published and URL inserted above
 - [ ] Production link tested inside Nimiq Pay, including native share/copy
 - [x] Icon, thumbnail, and four final screenshots prepared in `submission-assets/`
 - [ ] Optional video recorded and uploaded

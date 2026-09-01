@@ -4,6 +4,8 @@
 
 Pay It Sideways is a mobile-first Nimiq Pay Mini App for sending a genuine, private note of appreciation, optionally with a small claimable NIM gift. The recipient can keep it with no obligation or let it inspire a new message for someone else. Words-only participation is deliberately a complete experience.
 
+**Live app:** https://pay-it-sideways.grand-sugar.workers.dev
+
 ## Why Nimiq is integral
 
 The optional gift is funded by a real NIM transaction confirmed inside Nimiq Pay. The sender does not need the recipient's wallet address: the app generates a one-use gift account, Nimiq Pay funds it, and the complete private link lets the recipient claim to an account they select. Passing it on creates a new message and, only if chosen, a new transaction. Pay It Sideways never receives or controls the private key and never custodies funds. A recent-links screen can reconstruct sent links on the original device without storing the note's words in that index.
@@ -61,7 +63,7 @@ The 29 automated tests cover exact Luna parsing/storage, gift-key validation, Ni
 ## Deployment
 
 1. Authenticate Wrangler with `npx wrangler login`, or use the documented one-hour claimable preview flow with `npx wrangler deploy --temporary`.
-2. Run `npm run build` and `npx wrangler deploy`; current Wrangler automatically provisions the ID-less D1 binding and writes its resource ID to the configuration.
+2. Run `npm run build` and `npx wrangler deploy`. For a new deployment, current Wrangler can provision an ID-less D1 binding and write its resource ID to the configuration.
 3. Apply all migrations with `npx wrangler d1 migrations apply pay-it-sideways --remote`.
 4. Deploy once more so the verified build and migrated database are the release pair.
 5. Add the HTTPS deployment URL as a custom Mini App in Nimiq Pay and rerun the release checklist on Testnet, then Mainnet with the minimum amount.

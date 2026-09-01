@@ -9,7 +9,7 @@
 | Tagline | Someone showed up for you. Show up for someone else. |
 | Pricing | Free |
 | Repository | https://github.com/kirstyjhawker-hms/pay-it-sideways |
-| Demo | Add production HTTPS URL after deployment |
+| Demo | https://pay-it-sideways.grand-sugar.workers.dev |
 | Video | Add walkthrough URL if recorded |
 | GitHub login | `kirstyjhawker-hms` |
 | Contact email | Add in the submission portal; do not commit if you prefer it private |
@@ -60,7 +60,7 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Mobile widths, tap targets, focus states, and reduced motion checked
 - [x] 29 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
 - [ ] Real Testnet Send → Claim → Pass rerun in the current Nimiq Pay build
-- [ ] Cloudflare authentication, D1 creation/migration, and production deployment
+- [x] Cloudflare authentication, D1 creation/migration, and production deployment
 - [x] Public GitHub repository published and URL inserted above
 - [ ] Production link tested inside Nimiq Pay, including native share/copy
 - [x] Icon, thumbnail, and four final screenshots prepared in `submission-assets/`

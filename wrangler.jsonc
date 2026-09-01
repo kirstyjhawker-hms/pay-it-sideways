@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pay-it-sideways",
+  "account_id": "baf6621977d02d27326097296be1505d",
   "main": "worker/index.ts",
   "compatibility_date": "2026-08-11",
   "assets": {
@@ -13,7 +14,8 @@
     {
       "binding": "DB",
       "database_name": "pay-it-sideways",
-      "migrations_dir": "migrations"
+      "migrations_dir": "migrations",
+      "database_id": "bfbb8990-b93c-4db6-a308-be27ab646f81"
     }
   ]
 }

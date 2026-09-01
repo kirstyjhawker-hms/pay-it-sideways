@@ -13,6 +13,7 @@
 - The server broadcasts a locally signed claim but records it as claimed only after an included transaction is fetched and its hash, sender, value, and execution result match the stored gift.
 - A client-generated recipient token makes creation idempotent. If a save response is interrupted after D1 commits, retrying returns the same link.
 - A funded draft is persisted locally before wallet confirmation and restored after reload. Once funded, the UI will not silently switch it to words-only.
+- The recent-links index contains only the recipient token, creation time, and gift flag—not message text. If both local and session storage reject a gift key, navigation stops with a retryable error rather than exposing an incomplete funded link.
 - Reporting erases the words but leaves an unclaimed gift reachable, preventing report abuse from stranding funds.
 
 ## Red-team cases covered
@@ -30,6 +31,7 @@
 - Wrong network: transaction lookup across Testnet and Mainnet, then fixed per gift
 - Multiple wallet accounts: recipient chooses the destination explicitly
 - Lost/stripped fragment: sender warning, durable local recovery, and copy fallback
+- Disabled/quota-exhausted storage: fail closed before leaving the funded creation flow
 - Report griefing: message redaction does not disable financial recovery
 
 ## Residual risks

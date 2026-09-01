@@ -2,20 +2,22 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { track } from '../lib/analytics'
+import { listSentLinks, readGiftSecret, recipientUrl } from '../lib/sentLinks'
 
 const route = useRoute()
 const token = computed(() => String(route.params.token))
-function readStored(key: string): string | null {
-  try { return localStorage.getItem(key) || sessionStorage.getItem(key) } catch { return sessionStorage.getItem(key) }
-}
-const giftSecret = computed(() => readStored(`gift:${token.value}`))
+const giftSecret = computed(() => readGiftSecret(token.value))
 const sentSummary = computed(() => {
-  try { return JSON.parse(readStored(`sideways:${token.value}`) || '{}') as { includesGift?: boolean } } catch { return {} }
+  const indexed = listSentLinks().find((link) => link.token === token.value)
+  if (indexed) return { includesGift: indexed.includesGift }
+  try {
+    const raw = localStorage.getItem(`sideways:${token.value}`) || sessionStorage.getItem(`sideways:${token.value}`)
+    return JSON.parse(raw || '{}') as { includesGift?: boolean }
+  } catch { return {} }
 })
 const missingGiftKey = computed(() => sentSummary.value.includesGift === true && !giftSecret.value)
 const shareUrl = computed(() => {
-  const base = `${window.location.origin}/s/${token.value}`
-  return giftSecret.value ? `${base}#gift=${giftSecret.value}` : base
+  return recipientUrl(window.location.origin, token.value, giftSecret.value)
 })
 const shared = ref(false)
 const copyFailed = ref(false)

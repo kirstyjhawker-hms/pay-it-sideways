@@ -162,6 +162,8 @@ h1 {
   background: rgba(255, 253, 248, 0.65);
 }
 
+.recent-link { display: flex; min-height: 44px; align-items: center; justify-content: center; color: var(--leaf); font-size: 0.82rem; font-weight: 600; }
+
 .quiet-status {
   display: flex;
   min-height: 44px;
@@ -341,6 +343,19 @@ textarea:focus, input:focus { border-color: rgba(53, 97, 84, 0.6); background: v
 .manual-link { margin-top: 18px; text-align: left; }
 .manual-link label { display: block; margin-bottom: 7px; font-size: 0.75rem; font-weight: 700; }
 .manual-link input { min-height: 48px; padding: 0 13px; }
+
+.history-screen h1 { max-width: 12ch; font-size: clamp(2.2rem, 9vw, 4rem); }
+.history-list { display: grid; gap: 10px; margin: 28px 0; }
+.history-card { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255, 253, 248, 0.66); }
+.history-card strong { font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; }
+.history-card p { margin: 4px 0 0; color: var(--muted); font-size: 0.76rem; }
+.history-card .button { min-height: 48px; }
+.history-card .history-warning { color: var(--danger); line-height: 1.45; }
+.history-empty { display: grid; gap: 18px; margin: 30px 0; color: var(--muted); }
+
+@media (min-width: 560px) {
+  .history-card { grid-template-columns: 1fr auto; align-items: center; }
+}
 
 .loading-state, .empty-state { display: grid; min-height: 55vh; place-items: center; align-content: center; gap: 16px; text-align: center; }
 .loading-state p, .empty-state p { max-width: 32ch; margin: 0; color: var(--muted); line-height: 1.6; }

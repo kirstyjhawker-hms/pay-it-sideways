@@ -20,6 +20,7 @@
         <li>An unguessable recipient-link hash, chain relationship, and creation time.</li>
         <li>For NIM gifts: the amount, network, temporary public gift address, and public funding/claim transaction results.</li>
         <li>The one-use private gift key stays in the fragment of the shared link. A recovery copy remains in browser storage on the sender’s device. Browser URL fragments and that recovery copy are never sent to our database.</li>
+        <li>The recent-links list is also device-only. It stores the random token, creation time and whether NIM is attached—not the note’s words. Clearing site data removes the list and recovery keys.</li>
         <li>Whether the recipient chose “keep” or reported the message.</li>
       </ul>
       <h3>Why it is stored</h3>

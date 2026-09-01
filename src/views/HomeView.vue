@@ -2,10 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { getNimiqProvider } from '../lib/nimiq'
 import { track } from '../lib/analytics'
+import { listSentLinks } from '../lib/sentLinks'
 
 type ConnectionState = 'checking' | 'ready' | 'offline'
 const connectionState = ref<ConnectionState>('checking')
 const consensusEstablished = ref(false)
+const hasSentLinks = ref(false)
 
 const walletLabel = computed(() => {
   if (connectionState.value === 'checking') return 'Checking Nimiq Pay…'
@@ -15,6 +17,7 @@ const walletLabel = computed(() => {
 })
 
 onMounted(async () => {
+  hasSentLinks.value = listSentLinks().length > 0
   try {
     const provider = await getNimiqProvider()
     consensusEstablished.value = await provider.isConsensusEstablished()
@@ -42,6 +45,7 @@ onMounted(async () => {
       <RouterLink class="button button--primary button--wide" to="/create" @click="track('create_started')">
         Send some kindness <span aria-hidden="true">→</span>
       </RouterLink>
+      <RouterLink v-if="hasSentLinks" class="recent-link" to="/history">Reopen a recent private link</RouterLink>
 
       <div class="quiet-status" role="status" aria-live="polite">
         <span class="status-dot" :class="`status-dot--${connectionState}`" aria-hidden="true"></span>

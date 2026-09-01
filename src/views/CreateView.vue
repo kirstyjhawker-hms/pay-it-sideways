@@ -6,6 +6,7 @@ import { getNimiqProvider } from '../lib/nimiq'
 import { generateGiftKey, type GiftKey, type NimiqNetwork } from '../lib/gift'
 import { parseNimToLuna } from '../lib/money'
 import { track } from '../lib/analytics'
+import { saveGiftSecret, saveSentLink } from '../lib/sentLinks'
 
 type PaymentChoice = 'words' | 'nim'
 type SubmissionState = 'idle' | 'confirming' | 'saving'
@@ -218,19 +219,20 @@ async function submit(): Promise<void> {
     track('sideways_created')
     track(paymentChoice.value === 'nim' ? 'payment_used' : 'message_only_used')
     if (parentToken.value) track('continuation_completed')
-    const sentSummary = JSON.stringify({
-      reason: reason.value.trim(),
-      message: message.value.trim(),
+    if (paymentChoice.value === 'nim' && giftKey.value) {
+      saveGiftSecret(created.token, giftKey.value.secret)
+    }
+    saveSentLink({
+      token: created.token,
+      createdAt: new Date().toISOString(),
       includesGift: paymentChoice.value === 'nim',
     })
-    try { localStorage.setItem(`sideways:${created.token}`, sentSummary) } catch { sessionStorage.setItem(`sideways:${created.token}`, sentSummary) }
-    if (paymentChoice.value === 'nim' && giftKey.value) {
-      try { localStorage.setItem(`gift:${created.token}`, giftKey.value.secret) } catch { sessionStorage.setItem(`gift:${created.token}`, giftKey.value.secret) }
-    }
     clearPendingGift()
     await router.replace({ name: 'sent', params: { token: created.token } })
   } catch (error) {
-    if (completedTransaction.value) {
+    if (completedTransaction.value && error instanceof Error && /safely store/.test(error.message)) {
+      errorMessage.value = `${error.message} Your NIM will not be sent a second time.`
+    } else if (completedTransaction.value) {
       errorMessage.value = 'Your NIM was sent, but the private link was not saved yet. Tap below to retry—no second payment will be made.'
     } else {
       errorMessage.value = paymentError(error)

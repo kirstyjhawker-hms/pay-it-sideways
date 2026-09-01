@@ -6,7 +6,7 @@ Pay It Sideways is a mobile-first Nimiq Pay Mini App for sending a genuine, priv
 
 ## Why Nimiq is integral
 
-The optional gift is funded by a real NIM transaction confirmed inside Nimiq Pay. The sender does not need the recipient's wallet address: the app generates a one-use gift account, Nimiq Pay funds it, and the complete private link lets the recipient claim to an account they select. Passing it on creates a new message and, only if chosen, a new transaction. Pay It Sideways never receives or controls the private key and never custodies funds.
+The optional gift is funded by a real NIM transaction confirmed inside Nimiq Pay. The sender does not need the recipient's wallet address: the app generates a one-use gift account, Nimiq Pay funds it, and the complete private link lets the recipient claim to an account they select. Passing it on creates a new message and, only if chosen, a new transaction. Pay It Sideways never receives or controls the private key and never custodies funds. A recent-links screen can reconstruct sent links on the original device without storing the note's words in that index.
 
 This is an app-specific bearer gift, similar in principle to a Nimiq Cashlink. Anyone with the complete link can claim an unclaimed gift, so it must be shared privately.
 
@@ -56,7 +56,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-The 22 automated tests cover exact Luna parsing, gift-key validation, Nimiq network mapping, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, forged-claim rejection, broadcast, and post-chain confirmation. The message-only UI is also verified through a mobile-sized browser run. Final release acceptance includes a real Testnet Send → Claim → Pass run inside Nimiq Pay.
+The 26 automated tests cover exact Luna parsing, gift-key validation, Nimiq network mapping, device-local link recovery, storage-failure protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, forged-claim rejection, broadcast, and post-chain confirmation. The message-only UI and recent-link recovery are also verified through a mobile-sized browser run. Final release acceptance includes a real Testnet Send → Claim → Pass run inside Nimiq Pay.
 
 ## Deployment
 

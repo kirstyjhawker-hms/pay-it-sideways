@@ -13,6 +13,8 @@
     "typecheck": "vue-tsc -b --pretty false",
     "typecheck:worker": "tsc -p tsconfig.worker.json --noEmit",
     "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:worker": "vitest run --project worker",
     "preview": "vite preview --host 0.0.0.0",
     "deploy": "npm run build && wrangler deploy"
   },
@@ -23,8 +25,11 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.1.2",
     "@cloudflare/workers-types": "^5.20260901.1",
+    "@msw/cloudflare": "^0.0.1",
     "@vitejs/plugin-vue": "6.0.1",
+    "msw": "^2.15.0",
     "typescript": "5.9.2",
     "vite": "7.3.6",
     "vitest": "^4.1.11",

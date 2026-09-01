@@ -40,3 +40,7 @@
 - Blockchain transactions are irreversible. Users must check the amount in the native Nimiq Pay confirmation.
 
 Report vulnerabilities privately to the repository owner rather than placing a live gift link, message, private key, or wallet secret in a public issue.
+
+## Automated evidence
+
+`npm test` runs unit tests plus a deterministic integration suite inside Cloudflare's official Workers Vitest runtime with isolated D1 storage and mocked public RPC responses. It verifies both accepted flows and adversarial funding/claim cases without relying on a faucet or spending real funds.

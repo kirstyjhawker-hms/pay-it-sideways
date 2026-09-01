@@ -56,7 +56,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-The tests cover exact Luna parsing, gift-key validation, Nimiq network mapping, and strict funding/claim transaction matching. The message-only path and API failure states are also verified through a mobile-sized browser run. Final release acceptance includes a real Testnet Send → Claim → Pass run inside Nimiq Pay.
+The 22 automated tests cover exact Luna parsing, gift-key validation, Nimiq network mapping, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, forged-claim rejection, broadcast, and post-chain confirmation. The message-only UI is also verified through a mobile-sized browser run. Final release acceptance includes a real Testnet Send → Claim → Pass run inside Nimiq Pay.
 
 ## Deployment
 

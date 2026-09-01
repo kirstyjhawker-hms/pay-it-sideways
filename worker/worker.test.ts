@@ -7,10 +7,16 @@ import { network } from './test/network'
 
 const origin = 'https://app.example'
 const fundingHash = 'a'.repeat(64)
+const secondFundingHash = 'd'.repeat(64)
 const claimHash = 'b'.repeat(64)
+const replacementClaimHash = 'e'.repeat(64)
 const unrelatedHash = 'c'.repeat(64)
 const giftAddress = 'NQ32 64N4 02FC 6Q59 RV16 0MM4 HCDD X6KL SNN4'
+const secondGiftAddress = 'NQ22 GBGD Q7P1 EMMT R44A 4Q0B XS3B 0JSH 7RR7'
 const destination = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000'
+const serializedClaim = 'ab'.repeat(100)
+const replacementSerializedClaim = 'ef'.repeat(100)
+const unrelatedSerializedClaim = 'cd'.repeat(100)
 
 function request(path: string, init?: RequestInit): Request {
   return new Request(`${origin}${path}`, init)
@@ -42,6 +48,8 @@ describe('Worker API', () => {
 
     const created = await dispatch('/api/sideways', post(body))
     expect(created.status).toBe(201)
+    expect(created.headers.get('content-security-policy')).toContain("'wasm-unsafe-eval'")
+    expect(created.headers.get('content-security-policy')).not.toMatch(/(?:^| )'unsafe-eval'(?:;| )/)
     expect(created.headers.get('cache-control')).toBe('no-store')
     expect(created.headers.get('referrer-policy')).toBe('no-referrer')
     const first = await created.json<{ token: string; chainId: string }>()
@@ -93,6 +101,9 @@ describe('Worker API', () => {
   })
 
   it('verifies funding and claims before changing financial state', async () => {
+    let broadcasts = 0
+    let broadcastFails = true
+    let blockNumber = 12_345
     network.use(http.post('https://rpc.testnet.nimiqwatch.com', async ({ request }) => {
       const rpc = await request.json() as { id: string; method: string; params: unknown[] }
       let data: unknown
@@ -100,7 +111,15 @@ describe('Worker API', () => {
         const hash = String(rpc.params[0])
         if (hash === fundingHash) {
           data = { hash, from: destination, to: giftAddress, value: 100_000, executionResult: true }
+        } else if (hash === secondFundingHash) {
+          data = { hash, from: destination, to: secondGiftAddress, value: 20_000, executionResult: true }
         } else if (hash === claimHash) {
+          return HttpResponse.json({
+            jsonrpc: '2.0',
+            id: rpc.id,
+            error: { message: 'Internal error', data: `Transaction not found: ${hash}` },
+          })
+        } else if (hash === replacementClaimHash) {
           data = { hash, from: giftAddress, to: destination, value: 100_000, executionResult: true }
         } else {
           data = { hash, from: destination, to: giftAddress, value: 100_000, executionResult: true }
@@ -108,9 +127,31 @@ describe('Worker API', () => {
       } else if (rpc.method === 'getAccountByAddress') {
         data = { balance: 100_000 }
       } else if (rpc.method === 'getBlockNumber') {
-        data = 12_345
+        data = blockNumber
+      } else if (rpc.method === 'getRawTransactionInfo') {
+        const serialized = String(rpc.params[0])
+        data = {
+          hash: serialized === serializedClaim
+            ? claimHash
+            : serialized === replacementSerializedClaim ? replacementClaimHash : unrelatedHash,
+          from: serialized === serializedClaim || serialized === replacementSerializedClaim ? giftAddress : destination,
+          to: destination,
+          fromType: 0,
+          toType: 0,
+          value: 100_000,
+          fee: 0,
+          senderData: '',
+          recipientData: '',
+          flags: 0,
+          networkId: 5,
+          validityStartHeight: serialized === replacementSerializedClaim ? 20_000 : 12_345,
+        }
       } else if (rpc.method === 'sendRawTransaction') {
-        data = claimHash
+        broadcasts += 1
+        if (broadcastFails) {
+          return HttpResponse.json({ jsonrpc: '2.0', id: rpc.id, error: { message: 'Temporary broadcast failure' } })
+        }
+        data = String(rpc.params[0]) === replacementSerializedClaim ? replacementClaimHash : claimHash
       } else {
         return HttpResponse.json({ jsonrpc: '2.0', id: rpc.id, error: { message: 'Unexpected method' } })
       }
@@ -130,34 +171,108 @@ describe('Worker API', () => {
       giftAddress,
     }))
     expect(created.status).toBe(201)
+    const storedGift = await env.DB.prepare(
+      'SELECT payment_luna FROM sideways WHERE includes_payment = 1 AND transaction_hash = ?'
+    ).bind(fundingHash).first<{ payment_luna: number }>()
+    expect(storedGift?.payment_luna).toBe(100_000)
+
+    const paidChildToken = 'J'.repeat(43)
+    const paidChild = await dispatch('/api/sideways', post({
+      recipientToken: paidChildToken,
+      parentToken: token,
+      reason: 'Exact totals make the chain trustworthy.',
+      message: 'Even small decimal gifts should add up without floating-point noise.',
+      includesPayment: true,
+      paymentLuna: 20_000,
+      transactionHash: secondFundingHash,
+      paymentMode: 'claimable',
+      paymentNetwork: 'test',
+      giftAddress: secondGiftAddress,
+    }))
+    expect(paidChild.status).toBe(201)
+    const paidChildView = await dispatch(`/api/sideways/${paidChildToken}`)
+    expect(await paidChildView.json()).toMatchObject({
+      chain: { peopleReached: 2, nimPassed: 1.2 },
+    })
+
+    const legacyDirect = await dispatch('/api/sideways', post({
+      recipientToken: 'I'.repeat(43),
+      reason: 'A fabricated payment must never save.',
+      message: 'New direct-payment records are not accepted by this backend.',
+      includesPayment: true,
+      paymentLuna: 100_000,
+      transactionHash: fundingHash,
+    }))
+    expect(legacyDirect.status).toBe(422)
 
     const balance = await dispatch(`/api/sideways/${token}/gift-balance`)
-    expect(await balance.json()).toEqual({ balance: 100_000, blockNumber: 12_345 })
+    expect(await balance.json()).toEqual({
+      balance: 100_000,
+      blockNumber: 12_345,
+      pendingClaimTransactionHash: null,
+      pendingClaimExpired: false,
+    })
 
     const forgedConfirmation = await dispatch(`/api/sideways/${token}/claim-confirm`, post({
       transactionHash: unrelatedHash,
     }))
     expect(forgedConfirmation.status).toBe(422)
 
-    const broadcast = await dispatch(`/api/sideways/${token}/claim`, post({
-      serializedTransaction: 'ab'.repeat(100),
+    const relayAttempt = await dispatch(`/api/sideways/${token}/claim`, post({
+      serializedTransaction: unrelatedSerializedClaim,
     }))
-    expect(broadcast.status).toBe(200)
-    expect(await broadcast.json()).toEqual({ transactionHash: claimHash })
+    expect(relayAttempt.status).toBe(422)
+    expect(broadcasts).toBe(0)
+
+    const broadcast = await dispatch(`/api/sideways/${token}/claim`, post({
+      serializedTransaction: serializedClaim,
+    }))
+    expect(broadcast.status).toBe(202)
+    expect(await broadcast.json()).toEqual({ transactionHash: claimHash, broadcastUncertain: true })
+    expect(broadcasts).toBe(1)
 
     const beforeConfirmation = await dispatch(`/api/sideways/${token}`)
-    expect(await beforeConfirmation.json()).toMatchObject({ sideways: { claimed: false } })
+    expect(await beforeConfirmation.json()).toMatchObject({
+      sideways: { claimed: false, claimPending: true },
+    })
+    const pendingBalance = await dispatch(`/api/sideways/${token}/gift-balance`)
+    expect(await pendingBalance.json()).toMatchObject({ pendingClaimTransactionHash: claimHash })
+    const wrongPendingConfirmation = await dispatch(`/api/sideways/${token}/claim-confirm`, post({
+      transactionHash: unrelatedHash,
+    }))
+    expect(wrongPendingConfirmation.status).toBe(422)
+
+    broadcastFails = false
+    const rebroadcast = await dispatch(`/api/sideways/${token}/claim`, post({}))
+    expect(rebroadcast.status).toBe(200)
+    expect(await rebroadcast.json()).toEqual({ transactionHash: claimHash })
+    expect(broadcasts).toBe(2)
+
+    blockNumber = 20_000
+    const expiredBalance = await dispatch(`/api/sideways/${token}/gift-balance`)
+    expect(await expiredBalance.json()).toMatchObject({
+      pendingClaimTransactionHash: claimHash,
+      pendingClaimExpired: true,
+    })
+    const replacement = await dispatch(`/api/sideways/${token}/claim`, post({
+      serializedTransaction: replacementSerializedClaim,
+    }))
+    expect(replacement.status).toBe(200)
+    expect(await replacement.json()).toEqual({ transactionHash: replacementClaimHash })
+    expect(broadcasts).toBe(3)
 
     const confirmation = await dispatch(`/api/sideways/${token}/claim-confirm`, post({
-      transactionHash: claimHash,
+      transactionHash: replacementClaimHash,
     }))
     expect(confirmation.status).toBe(200)
-    expect(await confirmation.json()).toEqual({ transactionHash: claimHash, confirmed: true })
+    expect(await confirmation.json()).toEqual({ transactionHash: replacementClaimHash, confirmed: true })
 
     const afterConfirmation = await dispatch(`/api/sideways/${token}`)
     expect(await afterConfirmation.json()).toMatchObject({
-      sideways: { claimed: true, claimTransactionHash: claimHash },
+      sideways: { claimed: true, claimPending: false, claimTransactionHash: replacementClaimHash },
     })
+    const confirmedRetry = await dispatch(`/api/sideways/${token}/claim`, post({}))
+    expect(await confirmedRetry.json()).toEqual({ transactionHash: replacementClaimHash })
 
     const mismatch = await dispatch('/api/sideways', post({
       recipientToken: 'H'.repeat(43),

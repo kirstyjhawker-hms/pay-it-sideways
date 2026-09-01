@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { broadcastGiftClaim, confirmGiftClaim, getGiftState, getSideways, keepSideways, reportSideways } from '../lib/api'
 import type { SidewaysResponse } from '../types'
@@ -18,12 +18,18 @@ const kept = ref(false)
 const claimingFor = ref<'keep' | 'pass' | null>(null)
 const giftBalance = ref<number | null>()
 const giftBlockNumber = ref<number | null>()
+const pendingClaimHash = ref<string | null>()
+const pendingClaimExpired = ref(false)
 const checkingGift = ref(false)
 const reportOpen = ref(false)
 const reported = ref(false)
 const availableAccounts = ref<string[]>([])
 const selectingAccount = ref(false)
-const giftSecret = giftSecretFromHash()
+const accountPickerTitle = ref<HTMLElement>()
+const giftSecret = computed(() => {
+  void route.hash
+  return giftSecretFromHash()
+})
 
 const isClaimableGift = computed(() => data.value?.sideways.paymentMode === 'claimable')
 const giftIsReady = computed(() => {
@@ -55,6 +61,8 @@ async function refreshGiftBalance(): Promise<void> {
     const state = await getGiftState(token.value)
     giftBalance.value = state.balance
     giftBlockNumber.value = state.blockNumber
+    pendingClaimHash.value = state.pendingClaimTransactionHash
+    pendingClaimExpired.value = state.pendingClaimExpired
   } catch {
     giftBalance.value = null
     giftBlockNumber.value = null
@@ -65,8 +73,14 @@ async function refreshGiftBalance(): Promise<void> {
 
 function walletError(error: unknown): string {
   if (error && typeof error === 'object' && 'error' in error) {
-    const response = error as { error?: { message?: string } }
+    const response = error as { error?: { message?: string; type?: string } }
+    if (response.error?.type === 'PermissionDeniedError'
+      || /denied|cancel/i.test(response.error?.message || '')
+    ) return 'No account was selected. The NIM gift is still waiting safely in this private link.'
     return response.error?.message || 'Nimiq Pay could not complete that request.'
+  }
+  if (error instanceof Error && (error.name === 'PermissionDeniedError' || /denied|cancel/i.test(error.message))) {
+    return 'No account was selected. The NIM gift is still waiting safely in this private link.'
   }
   return error instanceof Error ? error.message : 'Nimiq Pay could not complete that request.'
 }
@@ -76,15 +90,26 @@ function shortAddress(address: string): string {
   return `${compact.slice(0, 8)}…${compact.slice(-6)}`
 }
 
+function markClaimed(transactionHash: string): void {
+  if (!data.value) return
+  data.value.sideways.claimed = true
+  data.value.sideways.claimTransactionHash = transactionHash
+  data.value.sideways.claimPending = false
+  pendingClaimHash.value = null
+  pendingClaimExpired.value = false
+  giftBalance.value = 0
+  selectingAccount.value = false
+}
+
 async function claimGift(recipient?: string): Promise<'claimed' | 'selecting' | 'failed'> {
   if (!data.value || !isClaimableGift.value || data.value.sideways.claimed) return 'claimed'
   const amount = data.value.sideways.paymentAmount
   const network = data.value.sideways.paymentNetwork
-  if (!giftSecret || typeof amount !== 'number' || !network) {
+  if ((!giftSecret.value && !pendingClaimHash.value) || typeof amount !== 'number' || !network) {
     errorMessage.value = 'This link is missing the private gift key. Ask the sender to share the complete link again.'
     return 'failed'
   }
-  if (!giftIsReady.value) {
+  if (!pendingClaimHash.value && !giftIsReady.value) {
     await refreshGiftBalance()
     if (!giftIsReady.value) {
       errorMessage.value = giftBalance.value === 0
@@ -95,42 +120,62 @@ async function claimGift(recipient?: string): Promise<'claimed' | 'selecting' | 
   }
 
   try {
-    const provider = await getNimiqProvider()
-    if (!recipient) {
-      const accounts = await provider.listAccounts()
-      if (!Array.isArray(accounts) || !accounts[0]) throw accounts
-      availableAccounts.value = [...new Set(accounts)]
-      if (availableAccounts.value.length > 1) {
-        selectingAccount.value = true
-        return 'selecting'
+    let transactionHash = pendingClaimHash.value
+    if (transactionHash && pendingClaimExpired.value) {
+      const oldClaim = await confirmGiftClaim({ token: token.value, transactionHash })
+      if (oldClaim.confirmed) {
+        markClaimed(transactionHash)
+        return 'claimed'
       }
-      recipient = availableAccounts.value[0]
+      if (giftIsReady.value) {
+        transactionHash = null
+        pendingClaimHash.value = null
+        pendingClaimExpired.value = false
+      }
     }
-    if (giftBlockNumber.value === null || giftBlockNumber.value === undefined) {
-      throw new Error('The Nimiq network height is unavailable. Please try again.')
+    if (!transactionHash) {
+      if (!giftSecret.value) throw new Error('This link is missing the private gift key. Ask the sender to share the complete link again.')
+      const provider = await getNimiqProvider()
+      if (!recipient) {
+        const accounts = await provider.listAccounts()
+        if (!Array.isArray(accounts) || !accounts[0]) throw accounts
+        availableAccounts.value = [...new Set(accounts)]
+        if (availableAccounts.value.length > 1) {
+          selectingAccount.value = true
+          await nextTick()
+          accountPickerTitle.value?.focus()
+          return 'selecting'
+        }
+        recipient = availableAccounts.value[0]
+      }
+      if (giftBlockNumber.value === null || giftBlockNumber.value === undefined) {
+        throw new Error('The Nimiq network height is unavailable. Please try again.')
+      }
+      const claim = await createClaimTransaction({
+        secret: giftSecret.value!,
+        recipient: recipient!,
+        value: Math.round(amount * 100_000),
+        validityStartHeight: giftBlockNumber.value,
+        network,
+      })
+      transactionHash = await broadcastGiftClaim({
+        token: token.value,
+        serializedTransaction: claim.serialized,
+      })
+      pendingClaimHash.value = transactionHash
+      pendingClaimExpired.value = false
+    } else {
+      transactionHash = await broadcastGiftClaim({ token: token.value })
+      pendingClaimHash.value = transactionHash
     }
-    const claim = await createClaimTransaction({
-      secret: giftSecret,
-      recipient: recipient!,
-      value: Math.round(amount * 100_000),
-      validityStartHeight: giftBlockNumber.value,
-      network,
-    })
-    const transactionHash = await broadcastGiftClaim({
-      token: token.value,
-      serializedTransaction: claim.serialized,
-    })
     let confirmed = false
     for (let attempt = 0; attempt < 15 && !confirmed; attempt += 1) {
       const result = await confirmGiftClaim({ token: token.value, transactionHash })
       confirmed = result.confirmed
       if (!confirmed) await new Promise((resolve) => window.setTimeout(resolve, 1_000))
     }
-    if (!confirmed) throw new Error('The claim was sent, but confirmation is still settling. Please try again in a moment; the app will not send a second valid claim.')
-    data.value.sideways.claimed = true
-    data.value.sideways.claimTransactionHash = transactionHash
-    giftBalance.value = 0
-    selectingAccount.value = false
+    if (!confirmed) throw new Error('The claim is saved, but network confirmation is still settling. Tap again to retry safely; no different claim will be created.')
+    markClaimed(transactionHash)
     return 'claimed'
   } catch (error) {
     errorMessage.value = walletError(error)
@@ -252,6 +297,8 @@ async function report(): Promise<void> {
               <strong v-if="data.sideways.claimed">{{ data.sideways.paymentAmount }} NIM has been claimed.</strong>
               <strong v-else>{{ data.sideways.paymentAmount }} NIM is waiting for you.</strong>
               <p v-if="data.sideways.claimed">It was moved from this private gift link into the chosen Nimiq account.</p>
+              <p v-else-if="pendingClaimHash && pendingClaimExpired">The earlier claim did not confirm before it expired. Choose keep or pass below to check it once more and, only if the NIM is still here, replace it safely.</p>
+              <p v-else-if="pendingClaimHash">Its claim transaction is settling. Choose keep or pass below to finish confirming it—no second claim will be created.</p>
               <p v-else-if="checkingGift">Confirming the gift on the Nimiq network…</p>
               <p v-else>You do not need to give the sender an address. Choose below and Nimiq Pay will let you select your account.</p>
             </template>
@@ -266,7 +313,7 @@ async function report(): Promise<void> {
 
       <section v-if="selectingAccount" class="flow-card account-picker" aria-labelledby="account-title">
         <p class="eyebrow">Choose where it goes</p>
-        <h2 id="account-title">Claim into which Nimiq account?</h2>
+        <h2 id="account-title" ref="accountPickerTitle" tabindex="-1">Claim into which Nimiq account?</h2>
         <p class="supporting">The sender never sees this choice.</p>
         <button v-for="account in availableAccounts" :key="account" class="button button--secondary button--wide" type="button" @click="selectAccount(account)">
           {{ shortAddress(account) }}

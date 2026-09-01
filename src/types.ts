@@ -19,6 +19,7 @@ export interface SidewaysResponse {
     paymentNetwork: 'main' | 'test' | null
     giftAddress: string | null
     claimTransactionHash: string | null
+    claimPending: boolean
     claimed: boolean
     kept: boolean
   }

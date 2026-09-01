@@ -26,7 +26,7 @@ This is an app-specific bearer gift, similar in principle to a Nimiq Cashlink. A
 - Cloudflare Worker API and D1
 - Same-origin frontend/API with a strict CSP and no third-party scripts
 
-Recipient tokens and gift keys have separate security properties. Only the SHA-256 hash of the 256-bit recipient token is stored in D1. The one-use gift key is in the URL fragment, which is not sent in HTTP requests, plus a local recovery copy on the sender's device. The backend stores only public blockchain data and verifies both the funding output and confirmed claim before recording them.
+Recipient tokens and gift keys have separate security properties. Only the SHA-256 hash of the 256-bit recipient token is stored in D1. The one-use gift key is in the URL fragment, which is not sent in HTTP requests, plus a local recovery copy on the sender's device. Before relaying a claim, the backend decodes the signed transaction through Nimiq RPC and constrains it to the stored gift address, exact Luna value, basic account types, zero fee/data/flags, and recorded network. It then verifies the included claim independently before recording it.
 
 ## Local development
 
@@ -56,23 +56,24 @@ npm run build
 npm audit --audit-level=high
 ```
 
-The 26 automated tests cover exact Luna parsing, gift-key validation, Nimiq network mapping, device-local link recovery, storage-failure protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, forged-claim rejection, broadcast, and post-chain confirmation. The message-only UI and recent-link recovery are also verified through a mobile-sized browser run. Final release acceptance includes a real Testnet Send → Claim → Pass run inside Nimiq Pay.
+The 29 automated tests cover exact Luna parsing/storage, gift-key validation, Nimiq network mapping, device-local link recovery, storage-failure protection, opt-in analytics consent, CSP drift protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, fabricated-payment and raw-relay rejection, interrupted claim recovery, rebroadcast, and post-chain confirmation. The message-only UI, recent-link recovery, analytics preference, and Nimiq WebAssembly under production CSP are also verified through mobile-sized browser runs. Final release acceptance includes a real Testnet Send → Claim → Pass run inside Nimiq Pay.
 
 ## Deployment
 
-1. Authenticate Wrangler: `npx wrangler login`.
-2. Create D1: `npx wrangler d1 create pay-it-sideways`.
-3. Put the returned database ID in `wrangler.jsonc`.
-4. Apply migrations: `npx wrangler d1 migrations apply pay-it-sideways --remote`.
-5. Build and deploy: `npm run build` then `npx wrangler deploy`.
-6. Add the HTTPS deployment URL as a custom Mini App in Nimiq Pay and rerun the release checklist on Testnet, then Mainnet with the minimum amount.
+1. Authenticate Wrangler with `npx wrangler login`, or use the documented one-hour claimable preview flow with `npx wrangler deploy --temporary`.
+2. Run `npm run build` and `npx wrangler deploy`; current Wrangler automatically provisions the ID-less D1 binding and writes its resource ID to the configuration.
+3. Apply all migrations with `npx wrangler d1 migrations apply pay-it-sideways --remote`.
+4. Deploy once more so the verified build and migrated database are the release pair.
+5. Add the HTTPS deployment URL as a custom Mini App in Nimiq Pay and rerun the release checklist on Testnet, then Mainnet with the minimum amount.
 
 ## Privacy and safety
 
 - No accounts, real names, public feed, public wallet addresses, or advertising trackers
 - Messages are accessible only to anyone holding their unguessable recipient link
 - NIM transactions remain public on the Nimiq blockchain
+- A settling claim temporarily stores its already-signed transaction—including the chosen destination address—for safe retry, then removes the raw copy after verified confirmation
 - Reporting permanently removes message text without blocking an attached gift claim
+- Optional product analytics are disabled until the user explicitly opts in; accepted events are stored only as bounded daily counters
 - Request size and field limits, prepared SQL, transaction verification, CSP, `no-referrer`, and no-store API responses reduce abuse and leakage risks
 - No leaderboard, streak, pressure language, or financial ranking
 
@@ -80,7 +81,7 @@ See [SECURITY.md](SECURITY.md) for the threat model and [SUBMISSION.md](SUBMISSI
 
 ## Known operational dependency
 
-The Worker uses public Nimiq RPC history endpoints to detect networks, verify confirmed funding/claims, read gift balances, and broadcast signed claims. If those endpoints are temporarily unavailable, the app preserves a funded draft on the sender's device and asks the user to retry rather than paying twice.
+The Worker uses public Nimiq RPC history endpoints to detect networks, verify confirmed funding/claims, read gift balances, decode signed claims before broadcast, and broadcast them. If those endpoints are temporarily unavailable, the app preserves a funded draft on the sender's device and asks the user to retry rather than paying twice. After a claim is prepared, its already-public signed transaction and hash are retained as pending so slow inclusion or an interrupted response can be confirmed or safely rebroadcast without creating a different claim.
 
 ## Licence
 

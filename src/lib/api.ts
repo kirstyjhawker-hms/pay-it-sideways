@@ -32,9 +32,9 @@ export async function createSideways(input: {
   return readJson<CreatedSideways>(response)
 }
 
-export async function getGiftState(token: string): Promise<{ balance: number | null; blockNumber: number | null }> {
+export async function getGiftState(token: string): Promise<{ balance: number | null; blockNumber: number | null; pendingClaimTransactionHash: string | null; pendingClaimExpired: boolean }> {
   const response = await fetch(`/api/sideways/${encodeURIComponent(token)}/gift-balance`)
-  return readJson<{ balance: number | null; blockNumber: number | null }>(response)
+  return readJson<{ balance: number | null; blockNumber: number | null; pendingClaimTransactionHash: string | null; pendingClaimExpired: boolean }>(response)
 }
 
 export async function detectNimiqNetwork(transactionHash: string): Promise<NimiqNetwork | null> {
@@ -49,7 +49,7 @@ export async function detectNimiqNetwork(transactionHash: string): Promise<Nimiq
 
 export async function broadcastGiftClaim(input: {
   token: string
-  serializedTransaction: string
+  serializedTransaction?: string
 }): Promise<string> {
   const response = await fetch(`/api/sideways/${encodeURIComponent(input.token)}/claim`, {
     method: 'POST',

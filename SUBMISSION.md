@@ -58,7 +58,7 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Claimable link requires no recipient address
 - [x] Funding and claim records are verified against the blockchain
 - [x] Mobile widths, tap targets, focus states, and reduced motion checked
-- [x] 26 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
+- [x] 29 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
 - [ ] Real Testnet Send → Claim → Pass rerun in the current Nimiq Pay build
 - [ ] Cloudflare authentication, D1 creation/migration, and production deployment
 - [x] Public GitHub repository published and URL inserted above

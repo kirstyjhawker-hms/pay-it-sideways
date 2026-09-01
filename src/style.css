@@ -45,6 +45,7 @@ input:focus-visible {
   outline: 3px solid rgba(53, 97, 84, 0.3);
   outline-offset: 3px;
 }
+.account-picker h2:focus-visible { outline: 3px solid rgba(53, 97, 84, 0.3); outline-offset: 4px; }
 
 .app-shell {
   display: flex;
@@ -424,6 +425,12 @@ textarea:focus, input:focus { border-color: rgba(53, 97, 84, 0.6); background: v
 .about-section ul { padding-left: 20px; }
 .about-section strong { color: var(--ink); }
 .about-callout { padding: 18px; border-radius: 16px; color: var(--leaf-dark) !important; background: rgba(53, 97, 84, 0.08); }
+.consent-choice { display: grid; gap: 8px; margin: 16px 0; padding: 16px; border: 1px solid var(--line); border-radius: 16px; }
+.consent-choice legend { padding: 0 6px; color: var(--ink); font-size: 0.82rem; font-weight: 700; }
+.consent-choice button { min-height: 48px; padding: 0 14px; border: 1px solid var(--line); border-radius: 13px; color: var(--ink); background: rgba(255, 253, 248, 0.7); cursor: pointer; font-weight: 600; }
+.consent-choice button.selected { border-color: var(--leaf); color: var(--leaf-dark); background: rgba(53, 97, 84, 0.08); }
+.analytics-details { color: var(--muted); font-size: 0.82rem; }
+.analytics-details summary { min-height: 44px; color: var(--leaf); cursor: pointer; font-weight: 600; }
 
 .page-enter-active, .page-leave-active, .step-enter-active, .step-leave-active { transition: opacity 150ms ease, transform 180ms ease; }
 .page-enter-from, .step-enter-from { opacity: 0; transform: translateY(6px); }

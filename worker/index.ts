@@ -29,11 +29,13 @@ interface SidewaysRow {
   includes_payment: number
   payment_currency: string | null
   payment_amount: number | null
+  payment_luna: number | null
   transaction_hash: string | null
   payment_mode: 'direct' | 'claimable' | null
   payment_network: 'main' | 'test' | null
   gift_address: string | null
   claim_transaction_hash: string | null
+  pending_claim_transaction_hash: string | null
   claimed_at: string | null
   status: string
   kept_at: string | null
@@ -63,6 +65,61 @@ function rpcUrl(network: NimiqNetwork): string {
     : 'https://rpc.nimiqwatch.com'
 }
 
+function nimiqNetworkId(network: NimiqNetwork): number {
+  return network === 'test' ? 5 : 24
+}
+
+function sameNimiqAddress(left: string, right: string): boolean {
+  return left.replace(/\s/g, '').toUpperCase() === right.replace(/\s/g, '').toUpperCase()
+}
+
+interface RawNimiqTransaction extends NimiqTransaction {
+  fromType?: number
+  toType?: number
+  fee?: number
+  flags?: number
+  senderData?: string
+  recipientData?: string
+  networkId?: number
+  validityStartHeight?: number
+}
+
+interface ValidatedClaim {
+  hash: string
+  validityStartHeight: number
+}
+
+const claimValidityWindow = 7_200
+
+async function validateSignedClaim(input: {
+  serializedTransaction: string
+  giftAddress: string
+  value: number
+  network: NimiqNetwork
+}): Promise<ValidatedClaim | null> {
+  try {
+    const transaction = await nimiqRpc<RawNimiqTransaction>(
+      input.network,
+      'getRawTransactionInfo',
+      [input.serializedTransaction],
+    )
+    if (!sameNimiqAddress(transaction.from || transaction.sender || '', input.giftAddress)
+      || Number(transaction.value) !== input.value
+      || transaction.fromType !== 0
+      || transaction.toType !== 0
+      || Number(transaction.fee) !== 0
+      || transaction.flags !== 0
+      || transaction.senderData !== ''
+      || transaction.recipientData !== ''
+      || transaction.networkId !== nimiqNetworkId(input.network)
+      || !Number.isInteger(transaction.validityStartHeight)
+      || (transaction.validityStartHeight as number) < 0
+    ) return null
+    const hash = transactionHashOf(transaction)?.toLowerCase()
+    return hash ? { hash, validityStartHeight: transaction.validityStartHeight as number } : null
+  } catch { return null }
+}
+
 async function nimiqRpc<T>(network: NimiqNetwork, method: string, params: unknown[]): Promise<T> {
   const response = await fetch(rpcUrl(network), {
     method: 'POST',
@@ -88,7 +145,7 @@ function json(data: unknown, status = 200): Response {
 
 function withSecurityHeaders(response: Response, noStore = false): Response {
   const secured = new Response(response.body, response)
-  secured.headers.set('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'")
+  secured.headers.set('content-security-policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'")
   secured.headers.set('referrer-policy', 'no-referrer')
   secured.headers.set('x-content-type-options', 'nosniff')
   secured.headers.set('permissions-policy', 'camera=(), microphone=(), geolocation=()')
@@ -168,15 +225,15 @@ async function createSideways(request: Request, env: Env): Promise<Response> {
     ) {
       return json({ error: 'That NIM amount is not valid.' }, 422)
     }
-    if (typeof body.transactionHash !== 'string'
-      || body.transactionHash.length < 16
-      || body.transactionHash.length > 4096
-    ) {
+    if (typeof body.transactionHash !== 'string' || !/^[a-f0-9]{64}$/i.test(body.transactionHash)) {
       return json({ error: 'The NIM transaction result is missing or invalid.' }, 422)
+    }
+    if (body.paymentMode !== 'claimable') {
+      return json({ error: 'New NIM gifts must use a verified private claim link.' }, 422)
     }
     paymentAmount = (body.paymentLuna as number) / 100_000
     transactionHash = body.transactionHash
-    paymentMode = body.paymentMode === 'claimable' ? 'claimable' : 'direct'
+    paymentMode = 'claimable'
     if (paymentMode === 'claimable') {
       if (body.paymentNetwork !== 'main' && body.paymentNetwork !== 'test') {
         return json({ error: 'The Nimiq network for this gift is missing.' }, 422)
@@ -231,13 +288,14 @@ async function createSideways(request: Request, env: Env): Promise<Response> {
     INSERT INTO sideways (
       id, chain_id, parent_id, created_at, recipient_token_hash,
       appreciation_reason, positive_message, includes_payment, payment_currency,
-      payment_amount, transaction_hash, payment_mode, payment_network, gift_address, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered')
+      payment_amount, payment_luna, transaction_hash, payment_mode, payment_network, gift_address, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered')
   `).bind(
     id, chainId, parentId, now, hash, reason, message,
     includesPayment ? 1 : 0,
     includesPayment ? 'NIM' : null,
     paymentAmount,
+    includesPayment ? body.paymentLuna as number : null,
     transactionHash,
     paymentMode,
     paymentNetwork,
@@ -261,8 +319,9 @@ async function getSideways(token: string, env: Env): Promise<Response> {
   const sideways = await env.DB.prepare(`
     SELECT id, chain_id, parent_id, created_at, appreciation_reason,
       positive_message, includes_payment, payment_currency, payment_amount,
+      payment_luna,
       transaction_hash, payment_mode, payment_network, gift_address,
-      claim_transaction_hash, claimed_at, status, kept_at
+      claim_transaction_hash, pending_claim_transaction_hash, claimed_at, status, kept_at
     FROM sideways WHERE recipient_token_hash = ?
   `).bind(hash).first<SidewaysRow>()
 
@@ -276,14 +335,14 @@ async function getSideways(token: string, env: Env): Promise<Response> {
     SELECT
       COUNT(*) AS people_reached,
       SUM(CASE WHEN includes_payment = 0 THEN 1 ELSE 0 END) AS message_only_passes,
-      COALESCE(SUM(CASE WHEN includes_payment = 1 THEN payment_amount ELSE 0 END), 0) AS nim_passed
+      COALESCE(SUM(CASE WHEN includes_payment = 1 THEN payment_luna ELSE 0 END), 0) AS nim_passed_luna
     FROM sideways s
     INNER JOIN consents c ON c.sideways_id = s.id
     WHERE s.chain_id = ? AND s.status = 'delivered' AND c.allow_aggregate_tracking = 1
   `).bind(sideways.chain_id).first<{
     people_reached: number
     message_only_passes: number
-    nim_passed: number
+    nim_passed_luna: number
   }>()
 
   const position = await env.DB.prepare(`
@@ -298,12 +357,13 @@ async function getSideways(token: string, env: Env): Promise<Response> {
       reported,
       includesPayment: sideways.includes_payment === 1,
       paymentCurrency: sideways.payment_currency,
-      paymentAmount: sideways.payment_amount,
+      paymentAmount: sideways.payment_luna === null ? sideways.payment_amount : sideways.payment_luna / 100_000,
       transactionHash: sideways.transaction_hash,
       paymentMode: sideways.payment_mode,
       paymentNetwork: sideways.payment_network,
       giftAddress: sideways.gift_address,
       claimTransactionHash: sideways.claim_transaction_hash,
+      claimPending: Boolean(sideways.pending_claim_transaction_hash),
       claimed: Boolean(sideways.claimed_at),
       kept: Boolean(sideways.kept_at),
     },
@@ -311,7 +371,7 @@ async function getSideways(token: string, env: Env): Promise<Response> {
       peopleReached: Number(stats?.people_reached ?? 1),
       positiveMessages: Number(stats?.people_reached ?? 1),
       messageOnlyPasses: Number(stats?.message_only_passes ?? 1),
-      nimPassed: Number(stats?.nim_passed ?? 0),
+      nimPassed: Number(stats?.nim_passed_luna ?? 0) / 100_000,
       position: Number(position?.position ?? 1),
     },
   })
@@ -320,10 +380,17 @@ async function getSideways(token: string, env: Env): Promise<Response> {
 async function getGiftBalance(token: string, env: Env): Promise<Response> {
   const hash = await tokenHash(token)
   const gift = await env.DB.prepare(`
-    SELECT gift_address, payment_network FROM sideways
+    SELECT gift_address, payment_network, pending_claim_transaction_hash,
+      pending_claim_validity_start_height
+    FROM sideways
     WHERE recipient_token_hash = ? AND status IN ('delivered', 'reported')
       AND includes_payment = 1 AND payment_mode = 'claimable'
-  `).bind(hash).first<{ gift_address: string; payment_network: NimiqNetwork }>()
+  `).bind(hash).first<{
+    gift_address: string
+    payment_network: NimiqNetwork
+    pending_claim_transaction_hash: string | null
+    pending_claim_validity_start_height: number | null
+  }>()
   if (!gift) return json({ error: 'This claimable gift could not be found.' }, 404)
 
   try {
@@ -331,9 +398,23 @@ async function getGiftBalance(token: string, env: Env): Promise<Response> {
       nimiqRpc<{ balance: number }>(gift.payment_network, 'getAccountByAddress', [gift.gift_address]),
       nimiqRpc<number>(gift.payment_network, 'getBlockNumber', []),
     ])
-    return json({ balance: Number(account.balance), blockNumber: Number(blockNumber) })
+    return json({
+      balance: Number(account.balance),
+      blockNumber: Number(blockNumber),
+      pendingClaimTransactionHash: gift.pending_claim_transaction_hash,
+      pendingClaimExpired: Boolean(
+        gift.pending_claim_transaction_hash
+        && gift.pending_claim_validity_start_height !== null
+        && Number(blockNumber) >= gift.pending_claim_validity_start_height + claimValidityWindow
+      ),
+    })
   } catch {
-    return json({ balance: null, blockNumber: null })
+    return json({
+      balance: null,
+      blockNumber: null,
+      pendingClaimTransactionHash: gift.pending_claim_transaction_hash,
+      pendingClaimExpired: false,
+    })
   }
 }
 
@@ -373,39 +454,120 @@ async function claimGift(request: Request, token: string, env: Env): Promise<Res
   } catch {
     return json({ error: 'That claim could not be read.' }, 400)
   }
-  if (typeof serializedTransaction !== 'string'
-    || !/^[a-f0-9]+$/i.test(serializedTransaction)
-    || serializedTransaction.length < 100
-    || serializedTransaction.length > 4096
-  ) {
-    return json({ error: 'That claim transaction is not valid.' }, 422)
-  }
-
   const hash = await tokenHash(token)
   const gift = await env.DB.prepare(`
-    SELECT id, payment_network, claim_transaction_hash FROM sideways
+    SELECT id, payment_luna, gift_address, payment_network, claim_transaction_hash,
+      pending_claim_transaction_hash, pending_claim_transaction,
+      pending_claim_validity_start_height
+    FROM sideways
     WHERE recipient_token_hash = ? AND status IN ('delivered', 'reported')
       AND includes_payment = 1 AND payment_mode = 'claimable'
   `).bind(hash).first<{
     id: string
+    payment_luna: number
+    gift_address: string
     payment_network: NimiqNetwork
     claim_transaction_hash: string | null
+    pending_claim_transaction_hash: string | null
+    pending_claim_transaction: string | null
+    pending_claim_validity_start_height: number | null
   }>()
   if (!gift) return json({ error: 'This claimable gift could not be found.' }, 404)
   if (gift.claim_transaction_hash) {
     return json({ transactionHash: gift.claim_transaction_hash })
   }
 
+  let transactionToBroadcast: string
+  let expectedHash: string
+  let replaceExpiredPending = false
+  if (gift.pending_claim_transaction_hash
+    && gift.pending_claim_transaction
+    && typeof serializedTransaction === 'string'
+    && gift.pending_claim_validity_start_height !== null
+  ) {
+    try {
+      const blockNumber = await nimiqRpc<number>(gift.payment_network, 'getBlockNumber', [])
+      if (Number(blockNumber) >= gift.pending_claim_validity_start_height + claimValidityWindow) {
+        try {
+          await nimiqRpc<NimiqTransaction>(
+            gift.payment_network,
+            'getTransactionByHash',
+            [gift.pending_claim_transaction_hash],
+          )
+          replaceExpiredPending = false
+        } catch (error) {
+          replaceExpiredPending = error instanceof Error && /transaction not found/i.test(error.message)
+        }
+      }
+    } catch { /* Keep the known pending claim when expiry cannot be verified. */ }
+  }
+
+  if (gift.pending_claim_transaction_hash && gift.pending_claim_transaction && !replaceExpiredPending) {
+    transactionToBroadcast = gift.pending_claim_transaction
+    expectedHash = gift.pending_claim_transaction_hash.toLowerCase()
+  } else {
+    if (typeof serializedTransaction !== 'string'
+      || !/^[a-f0-9]+$/i.test(serializedTransaction)
+      || serializedTransaction.length < 100
+      || serializedTransaction.length > 4096
+    ) {
+      return json({ error: 'That claim transaction is not valid.' }, 422)
+    }
+    const decoded = await validateSignedClaim({
+      serializedTransaction,
+      giftAddress: gift.gift_address,
+      value: gift.payment_luna,
+      network: gift.payment_network,
+    })
+    if (!decoded) return json({ error: 'That claim transaction does not match this private gift.' }, 422)
+
+    const update = replaceExpiredPending
+      ? env.DB.prepare(`
+        UPDATE sideways
+        SET pending_claim_transaction_hash = ?, pending_claim_transaction = ?,
+          pending_claim_created_at = ?, pending_claim_validity_start_height = ?
+        WHERE id = ? AND pending_claim_transaction_hash = ?
+      `).bind(
+        decoded.hash,
+        serializedTransaction,
+        new Date().toISOString(),
+        decoded.validityStartHeight,
+        gift.id,
+        gift.pending_claim_transaction_hash,
+      )
+      : env.DB.prepare(`
+      UPDATE sideways
+      SET pending_claim_transaction_hash = ?, pending_claim_transaction = ?,
+        pending_claim_created_at = ?, pending_claim_validity_start_height = ?
+      WHERE id = ? AND pending_claim_transaction_hash IS NULL
+    `).bind(decoded.hash, serializedTransaction, new Date().toISOString(), decoded.validityStartHeight, gift.id)
+    await update.run()
+    const pending = await env.DB.prepare(`
+      SELECT pending_claim_transaction_hash, pending_claim_transaction
+      FROM sideways WHERE id = ?
+    `).bind(gift.id).first<{
+      pending_claim_transaction_hash: string
+      pending_claim_transaction: string
+    }>()
+    if (!pending?.pending_claim_transaction_hash || !pending.pending_claim_transaction) {
+      return json({ error: 'The pending claim could not be saved safely. Please try again.' }, 500)
+    }
+    transactionToBroadcast = pending.pending_claim_transaction
+    expectedHash = pending.pending_claim_transaction_hash.toLowerCase()
+  }
+
   try {
     const transactionHash = await nimiqRpc<string>(
       gift.payment_network,
       'sendRawTransaction',
-      [serializedTransaction],
+      [transactionToBroadcast],
     )
+    if (transactionHash.toLowerCase() !== expectedHash) {
+      return json({ error: 'The Nimiq network returned an unexpected claim identifier.' }, 502)
+    }
     return json({ transactionHash })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'The NIM could not be claimed just now.'
-    return json({ error: message }, 502)
+  } catch {
+    return json({ transactionHash: expectedHash, broadcastUncertain: true }, 202)
   }
 }
 
@@ -423,19 +585,27 @@ async function confirmGiftClaim(request: Request, token: string, env: Env): Prom
 
   const hash = await tokenHash(token)
   const gift = await env.DB.prepare(`
-    SELECT id, gift_address, payment_amount, payment_network, claim_transaction_hash FROM sideways
+    SELECT id, gift_address, payment_luna, payment_network, claim_transaction_hash,
+      pending_claim_transaction_hash
+    FROM sideways
     WHERE recipient_token_hash = ? AND status IN ('delivered', 'reported')
       AND includes_payment = 1 AND payment_mode = 'claimable'
   `).bind(hash).first<{
     id: string
     gift_address: string
-    payment_amount: number
+    payment_luna: number
     payment_network: NimiqNetwork
     claim_transaction_hash: string | null
+    pending_claim_transaction_hash: string | null
   }>()
   if (!gift) return json({ error: 'This claimable gift could not be found.' }, 404)
   if (gift.claim_transaction_hash) {
     return json({ transactionHash: gift.claim_transaction_hash, confirmed: true })
+  }
+  if (gift.pending_claim_transaction_hash
+    && gift.pending_claim_transaction_hash.toLowerCase() !== transactionHash.toLowerCase()
+  ) {
+    return json({ error: 'That transaction is not the pending claim for this private gift.' }, 422)
   }
 
   try {
@@ -444,12 +614,16 @@ async function confirmGiftClaim(request: Request, token: string, env: Env): Prom
       transaction,
       hash: transactionHash,
       from: gift.gift_address,
-      value: Math.round(gift.payment_amount * 100_000),
+      value: gift.payment_luna,
     })) {
       return json({ error: 'That transaction does not claim this private gift.' }, 422)
     }
     await env.DB.prepare(`
-      UPDATE sideways SET claim_transaction_hash = ?, claimed_at = ?
+      UPDATE sideways SET claim_transaction_hash = ?, claimed_at = ?,
+        pending_claim_transaction_hash = NULL,
+        pending_claim_transaction = NULL,
+        pending_claim_created_at = NULL,
+        pending_claim_validity_start_height = NULL
       WHERE id = ? AND claim_transaction_hash IS NULL
     `).bind(transactionHash, new Date().toISOString(), gift.id).run()
     const saved = await env.DB.prepare(

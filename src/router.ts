@@ -12,6 +12,7 @@ export const router = createRouter({
     { path: '/trail/:token', name: 'trail', component: () => import('./views/TrailView.vue') },
     { path: '/s/:token', name: 'receive', component: () => import('./views/ReceiveView.vue') },
     { path: '/about', name: 'about', component: () => import('./views/AboutView.vue') },
+    { path: '/founder-kindness', name: 'campaign', component: () => import('./views/CampaignView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

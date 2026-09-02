@@ -4,7 +4,12 @@ interface Env {
   DB: D1Database
   ASSETS: Fetcher
   RATE_LIMIT_SECRET?: string
+  CAMPAIGN_ACCESS_HASH?: string
+  CAMPAIGN_ADMIN_HASH?: string
 }
+
+const campaignGiftLuna = 500_000_000
+const campaignCapacity = 20
 
 interface CreateSidewaysBody {
   recipientToken?: unknown
@@ -191,6 +196,11 @@ async function hmacHex(secret: string, value: string): Promise<string> {
   return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+async function secretMatches(value: unknown, expectedHash?: string): Promise<boolean> {
+  if (typeof value !== 'string' || value.length < 32 || value.length > 256 || !expectedHash) return false
+  return (await tokenHash(value)) === expectedHash.toLowerCase()
+}
+
 async function enforceRateLimit(
   request: Request,
   env: Env,
@@ -312,7 +322,7 @@ async function createSideways(request: Request, env: Env): Promise<Response> {
   if (includesPayment) {
     if (!Number.isInteger(body.paymentLuna)
       || (body.paymentLuna as number) < 1
-      || (body.paymentLuna as number) > 100_000_000
+      || (body.paymentLuna as number) > 1_000_000_000
     ) {
       return json({ error: 'That NIM amount is not valid.' }, 422)
     }
@@ -787,8 +797,115 @@ async function registerDevice(request: Request, env: Env): Promise<Response> {
   return json({ counted: true })
 }
 
+async function campaignStatus(env: Env): Promise<Response> {
+  const totals = await env.DB.prepare(`
+    SELECT COUNT(*) AS funded,
+      SUM(CASE WHEN allocated_at IS NOT NULL THEN 1 ELSE 0 END) AS allocated
+    FROM founder_campaign_slots
+  `).first<{ funded: number; allocated: number }>()
+  const funded = Number(totals?.funded ?? 0)
+  const allocated = Number(totals?.allocated ?? 0)
+  return json({
+    enabled: Boolean(env.CAMPAIGN_ACCESS_HASH && env.CAMPAIGN_ADMIN_HASH),
+    capacity: campaignCapacity,
+    giftAmount: campaignGiftLuna / 100_000,
+    funded,
+    allocated,
+    remaining: Math.max(0, funded - allocated),
+  })
+}
+
+async function addCampaignSlot(request: Request, env: Env): Promise<Response> {
+  let body: { adminToken?: unknown; recipientToken?: unknown; encryptedGift?: unknown }
+  try { body = await readSmallJson(request, 2048) } catch {
+    return json({ error: 'That funded gift could not be read.' }, 400)
+  }
+  if (!await secretMatches(body.adminToken, env.CAMPAIGN_ADMIN_HASH)) {
+    return json({ error: 'This campaign setup link is not authorised.' }, 403)
+  }
+  if (typeof body.recipientToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.recipientToken)
+    || typeof body.encryptedGift !== 'string'
+    || !/^[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{100,512}$/.test(body.encryptedGift)
+  ) return json({ error: 'The private funded link is invalid.' }, 422)
+
+  const hash = await tokenHash(body.recipientToken)
+  const gift = await env.DB.prepare(`
+    SELECT id FROM sideways
+    WHERE recipient_token_hash = ? AND includes_payment = 1
+      AND payment_luna = ? AND payment_mode = 'claimable' AND payment_network = 'main'
+      AND claimed_at IS NULL AND status = 'delivered'
+  `).bind(hash, campaignGiftLuna).first<{ id: string }>()
+  if (!gift) return json({ error: 'Only a confirmed, unclaimed 5,000 NIM Mainnet gift can enter this campaign.' }, 422)
+
+  const total = await env.DB.prepare('SELECT COUNT(*) AS total FROM founder_campaign_slots')
+    .first<{ total: number }>()
+  if (Number(total?.total ?? 0) >= campaignCapacity) {
+    return json({ error: 'All twenty founder gifts are already funded.' }, 409)
+  }
+  try {
+    await env.DB.prepare(`
+      INSERT INTO founder_campaign_slots (sideways_id, encrypted_gift, created_at)
+      VALUES (?, ?, ?)
+    `).bind(gift.id, body.encryptedGift, new Date().toISOString()).run()
+  } catch {
+    return json({ error: 'That funded gift is already in the campaign.' }, 409)
+  }
+  return campaignStatus(env)
+}
+
+async function allocateCampaignGift(request: Request, env: Env): Promise<Response> {
+  let body: { campaignToken?: unknown; deviceId?: unknown }
+  try { body = await readSmallJson(request, 2048) } catch {
+    return json({ error: 'That kindness request could not be read.' }, 400)
+  }
+  if (!await secretMatches(body.campaignToken, env.CAMPAIGN_ACCESS_HASH)) {
+    return json({ error: 'This private founder invitation is not valid.' }, 403)
+  }
+  if (typeof body.deviceId !== 'string' || !/^[a-f0-9]{64}$/i.test(body.deviceId)) {
+    return json({ error: 'Open this invitation inside Nimiq Pay and approve the anonymous one-per-device check.' }, 422)
+  }
+  if (!env.RATE_LIMIT_SECRET) return json({ error: 'Abuse protection is temporarily unavailable.' }, 503)
+  const deviceHash = await hmacHex(env.RATE_LIMIT_SECRET, `founder-campaign:${body.deviceId.toLowerCase()}`)
+  let slot = await env.DB.prepare(
+    'SELECT encrypted_gift FROM founder_campaign_slots WHERE allocated_device_hash = ?'
+  ).bind(deviceHash).first<{ encrypted_gift: string }>()
+
+  if (!slot) {
+    try {
+      slot = await env.DB.prepare(`
+        UPDATE founder_campaign_slots
+        SET allocated_device_hash = ?, allocated_at = ?
+        WHERE id = (
+          SELECT id FROM founder_campaign_slots
+          WHERE allocated_at IS NULL ORDER BY id LIMIT 1
+        ) AND allocated_at IS NULL
+        RETURNING encrypted_gift
+      `).bind(deviceHash, new Date().toISOString()).first<{ encrypted_gift: string }>()
+    } catch {
+      slot = await env.DB.prepare(
+        'SELECT encrypted_gift FROM founder_campaign_slots WHERE allocated_device_hash = ?'
+      ).bind(deviceHash).first<{ encrypted_gift: string }>()
+    }
+  }
+  if (!slot) return json({ error: 'The twenty founder-funded kindness pots have all started their journeys.' }, 410)
+
+  return json({ encryptedGift: slot.encrypted_gift })
+}
+
 async function handleApi(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
+  if (request.method === 'GET' && url.pathname === '/api/campaign/status') {
+    const limited = await enforceRateLimit(request, env, 'campaign-status', 120, 3_600)
+    return limited || campaignStatus(env)
+  }
+  if (request.method === 'POST' && url.pathname === '/api/campaign/slots') {
+    const limited = await enforceRateLimit(request, env, 'campaign-setup', 30, 3_600)
+    return limited || addCampaignSlot(request, env)
+  }
+  if (request.method === 'POST' && url.pathname === '/api/campaign/allocate') {
+    const limited = await enforceRateLimit(request, env, 'campaign-allocate', 3, 86_400)
+    return limited || allocateCampaignGift(request, env)
+  }
   if (request.method === 'POST' && url.pathname === '/api/events') {
     const limited = await enforceRateLimit(request, env, 'events', 120, 3_600)
     if (limited) return limited

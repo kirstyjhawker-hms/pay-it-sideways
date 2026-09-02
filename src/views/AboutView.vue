@@ -54,6 +54,7 @@ async function chooseAnalytics(allowed: boolean): Promise<void> {
         <li>The one-use private gift key stays in the fragment of the shared link. A recovery copy remains in browser storage on the sender’s device. Browser URL fragments and that recovery copy are never sent to our database.</li>
         <li>After NIM funding, an unfinished draft temporarily keeps the note, link token and gift key in browser storage until the private link is safely saved. This prevents a reload or network interruption from prompting a second payment.</li>
         <li>The recent-links list is also device-only. It stores the random token, creation time and whether NIM is attached—not the note’s words. Clearing site data removes the list and recovery keys.</li>
+        <li>For the limited founder campaign, each already-funded private gift link is encrypted before storage. When someone accepts one, Nimiq Pay supplies a per-site device identifier; the app stores only a keyed one-way hash so the same device receives the same single gift rather than consuming another.</li>
         <li>Whether the recipient chose “keep” or reported the message.</li>
       </ul>
       <h3>Why it is stored</h3>
@@ -69,6 +70,7 @@ async function chooseAnalytics(allowed: boolean): Promise<void> {
       <p>A private message remains available until its recipient reports it; there is no automatic expiry in this competition release. Reporting removes the words but retains non-content chain and transaction integrity data. Public blockchain transactions cannot be erased by this app.</p>
       <h3>Analytics</h3>
       <p>Optional analytics count only basic product actions, grouped by day. With separate consent inside Nimiq Pay, they can also count a device once using a one-way hash of Nimiq Pay’s per-site device identifier. They contain no message text, recipient references, wallet addresses, transaction identifiers, cookies, or advertising trackers. Analytics are off unless you choose to allow them.</p>
+      <p>The founder campaign’s one-per-device check is used only to distribute its twenty prepaid gifts fairly. It is separate from optional analytics and is not used for advertising or cross-site tracking.</p>
       <p>To reduce spam and protect availability, write-heavy requests are limited per hour using a short-lived keyed hash of the connecting network address. The raw address is not stored, and the hash is not used for advertising or a long-term profile.</p>
       <details class="analytics-details">
         <summary>See the exact events counted</summary>

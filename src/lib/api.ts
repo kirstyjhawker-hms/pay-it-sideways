@@ -91,3 +91,39 @@ export async function keepSideways(token: string): Promise<void> {
 export async function reportSideways(token: string): Promise<void> {
   await readJson(await fetch(`/api/sideways/${encodeURIComponent(token)}/report`, { method: 'POST' }))
 }
+
+export interface CampaignStatus {
+  enabled: boolean
+  capacity: number
+  giftAmount: number
+  funded: number
+  allocated: number
+  remaining: number
+}
+
+export async function getCampaignStatus(): Promise<CampaignStatus> {
+  return readJson<CampaignStatus>(await fetch('/api/campaign/status'))
+}
+
+export async function addCampaignSlot(input: {
+  adminToken: string
+  recipientToken: string
+  encryptedGift: string
+}): Promise<CampaignStatus> {
+  return readJson<CampaignStatus>(await fetch('/api/campaign/slots', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  }))
+}
+
+export async function allocateCampaignGift(input: {
+  campaignToken: string
+  deviceId: string
+}): Promise<{ encryptedGift: string }> {
+  return readJson<{ encryptedGift: string }>(await fetch('/api/campaign/allocate', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  }))
+}

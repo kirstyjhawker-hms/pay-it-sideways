@@ -359,7 +359,7 @@ async function submit(): Promise<void> {
           </div>
           <label class="field-label" for="nim-amount">NIM amount</label>
           <div class="amount-input"><input id="nim-amount" v-model="nimAmount" inputmode="decimal" autocomplete="off" aria-describedby="amount-help" /><span>NIM</span></div>
-          <p id="amount-help" class="input-help">Up to five decimal places. Maximum 1,000 NIM. You do not need their Nimiq address—the private link carries the gift.</p>
+          <p id="amount-help" class="input-help">Up to five decimal places. Maximum 10,000 NIM. You do not need their Nimiq address—the private link carries the gift.</p>
         </div>
 
         <button class="button button--primary button--wide" type="button" :disabled="!paymentReady" @click="goToReview">Review your note <span aria-hidden="true">→</span></button>

@@ -7,6 +7,7 @@ import { network } from './test/network'
 
 const origin = 'https://app.example'
 const fundingHash = 'a'.repeat(64)
+const campaignFundingHash = '9'.repeat(64)
 const secondFundingHash = 'd'.repeat(64)
 const claimHash = 'b'.repeat(64)
 const replacementClaimHash = 'e'.repeat(64)
@@ -24,11 +25,16 @@ function request(path: string, init?: RequestInit): Request {
   return new Request(`${origin}${path}`, init)
 }
 
-async function dispatch(path: string, init?: RequestInit): Promise<Response> {
+async function dispatch(path: string, init?: RequestInit, bindings: unknown = env): Promise<Response> {
   const context = createExecutionContext()
-  const response = await worker.fetch(request(path, init), env, context)
+  const response = await worker.fetch(request(path, init), bindings as never, context)
   await waitOnExecutionContext(context)
   return response
+}
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 function post(body?: unknown): RequestInit {
@@ -47,6 +53,64 @@ function postFrom(body: unknown, address: string): RequestInit {
 }
 
 describe('Worker API', () => {
+  it('allocates each encrypted founder gift once and retries idempotently', async () => {
+    const accessToken = 'campaign-access-token-abcdefghijklmnopqrstuvwxyz'
+    const adminToken = 'campaign-admin-token-abcdefghijklmnopqrstuvwxyz'
+    const bindings = {
+      ...env,
+      RATE_LIMIT_SECRET: 'campaign-test-rate-secret',
+      CAMPAIGN_ACCESS_HASH: await sha256(accessToken),
+      CAMPAIGN_ADMIN_HASH: await sha256(adminToken),
+    }
+    network.use(http.post('https://rpc.nimiqwatch.com', async ({ request }) => {
+      const rpc = await request.json() as { id: string; method: string; params: unknown[] }
+      if (rpc.method !== 'getTransactionByHash') {
+        return HttpResponse.json({ jsonrpc: '2.0', id: rpc.id, error: { message: 'Unexpected method' } })
+      }
+      return HttpResponse.json({ jsonrpc: '2.0', id: rpc.id, result: { data: {
+        hash: campaignFundingHash,
+        from: destination,
+        to: giftAddress,
+        value: 500_000_000,
+        executionResult: true,
+      } } })
+    }))
+
+    const token = 'C'.repeat(43)
+    const created = await dispatch('/api/sideways', post({
+      recipientToken: token,
+      trailToken: 'L'.repeat(43),
+      reason: 'Thank you for helping begin this kindness chain.',
+      message: 'This founder-funded kindness is yours to keep or pass onwards.',
+      includesPayment: true,
+      paymentLuna: 500_000_000,
+      transactionHash: campaignFundingHash,
+      paymentMode: 'claimable',
+      paymentNetwork: 'main',
+      giftAddress,
+    }), bindings)
+    expect({ status: created.status, body: await created.clone().text() }).toEqual({ status: 201, body: expect.any(String) })
+
+    const added = await dispatch('/api/campaign/slots', postFrom({
+      adminToken,
+      recipientToken: token,
+      encryptedGift: `abcdefghijklmnop.${'x'.repeat(100)}`,
+    }, '203.0.113.31'), bindings)
+    expect(added.status).toBe(200)
+    expect(await added.json()).toMatchObject({ capacity: 20, giftAmount: 5000, funded: 1, remaining: 1 })
+
+    const deviceId = '2'.repeat(64)
+    const first = await dispatch('/api/campaign/allocate', postFrom({ campaignToken: accessToken, deviceId }, '203.0.113.32'), bindings)
+    expect(first.status).toBe(200)
+    const firstBody = await first.json<{ path: string }>()
+    expect(firstBody.encryptedGift).toBe(`abcdefghijklmnop.${'x'.repeat(100)}`)
+
+    const retry = await dispatch('/api/campaign/allocate', postFrom({ campaignToken: accessToken, deviceId }, '203.0.113.32'), bindings)
+    expect(await retry.json()).toEqual(firstBody)
+    const exhausted = await dispatch('/api/campaign/allocate', postFrom({ campaignToken: accessToken, deviceId: '3'.repeat(64) }, '203.0.113.33'), bindings)
+    expect(exhausted.status).toBe(410)
+  })
+
   it('runs the private words-only lifecycle idempotently', async () => {
     const token = 'D'.repeat(43)
     const trailToken = 'T'.repeat(43)

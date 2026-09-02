@@ -8,6 +8,7 @@
 - A separate 256-bit Nimiq private key controls an optional one-use gift. It is carried in the URL fragment and retained locally by the sender for recovery; it is never sent to or stored by the API.
 - Funding and claim transactions are public blockchain data.
 - A signed pending claim contains its chosen destination address. D1 retains that public transaction temporarily for idempotent rebroadcast, then deletes the raw copy after verified confirmation or replaces it only after definite expiry and on-chain absence.
+- The founder campaign stores separately funded bearer gift links only as ciphertext. Its private campaign token derives the browser-side encryption key and is stored server-side only as a one-way hash, so the Worker cannot decrypt or spend campaign gifts.
 
 ## Important properties
 
@@ -21,6 +22,7 @@
 - A sender who still has the locally stored complete link can reclaim an unclaimed gift through the normal recipient claim flow. This is recovery, not a revocation guarantee: whoever claims the bearer gift first controls it.
 - Write-heavy API routes are throttled with short-lived HMAC identifiers derived from Cloudflare's connecting address. Raw network addresses are not stored.
 - With explicit in-app consent, unique-device evidence stores only a second one-way hash of Nimiq Pay's origin-scoped device identifier.
+- Founder-campaign allocation uses a separate keyed hash of that origin-scoped device identifier to return the same allocation on retry and prevent ordinary duplicate claims. This is required for that limited campaign, not analytics consent, and is never used for advertising.
 - Messages are stored server-side so the private bearer link can retrieve them. They are not end-to-end encrypted; link secrecy is the access boundary.
 
 ## Red-team cases covered
@@ -46,6 +48,8 @@
 - Disabled/quota-exhausted storage: fail closed before leaving the funded creation flow
 - CSP breakage of the wallet path: self-hosted scripts plus the narrow `wasm-unsafe-eval` capability required by official Nimiq WebAssembly; no general `unsafe-eval`
 - Report griefing: message redaction does not disable financial recovery
+- Campaign database disclosure: stored gift links remain encrypted under a key derived from the fragment-only 256-bit campaign token
+- Campaign replay: a device receives its existing allocation rather than consuming another; allocation and uniqueness are enforced atomically in D1
 
 ## Residual risks
 
@@ -54,6 +58,7 @@
 - Public RPC unavailability can delay creation, balance checks, or claims.
 - A pending signed claim and destination address remain in D1 until it confirms or an expired, definitely absent transaction is safely replaced.
 - Blockchain transactions are irreversible. Users must check the amount in the native Nimiq Pay confirmation.
+- A determined person who possesses the private campaign invitation may attempt to spoof device identifiers or rotate network addresses. The 20-gift cap, Nimiq Pay device check, keyed deduplication, and IP throttling reduce but cannot eliminate this risk; the invitation should be shared with intended testers rather than posted as a public cash promotion.
 
 Report vulnerabilities privately to the repository owner rather than placing a live gift link, message, private key, or wallet secret in a public issue.
 

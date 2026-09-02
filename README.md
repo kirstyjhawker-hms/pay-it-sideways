@@ -12,6 +12,8 @@ The optional gift is funded by a real NIM transaction confirmed inside Nimiq Pay
 
 This is an app-specific bearer gift, similar in principle to a Nimiq Cashlink. Anyone with the complete link can claim an unclaimed gift, so it must be shared privately.
 
+The limited founder campaign can distribute twenty separately prepaid 5,000 NIM gifts from one reusable private invitation. Each gift link is encrypted in the founder's browser using the private campaign token before upload. The Worker stores and assigns only opaque ciphertext; the recipient's browser decrypts its allocated link. The Worker never receives a gift private key. An origin-scoped Nimiq Pay device identifier is stored only as a keyed hash to make allocation idempotent and limit the campaign to one gift per device.
+
 ## Product flow
 
 1. Write why someone came to mind and what you want them to hear.
@@ -58,7 +60,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-Automated tests cover exact Luna parsing/storage, gift-key validation, Nimiq network mapping, device-local link and trail recovery, trail-data separation, sender recovery, storage-failure protection, opt-in analytics consent, unique-device deduplication, request throttling, CSP drift protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, actual first-open totals, keep/pass linkage, direct link-to-link gift relay, reporting, bounded analytics, fabricated-payment and raw-relay rejection, interrupted claim recovery, rebroadcast, and post-chain confirmation. The message-only UI, recent-link recovery, analytics preference, and Nimiq WebAssembly under production CSP are also verified through mobile-sized browser runs. Release acceptance included a real Testnet Send → Claim flow and native share/copy inside Nimiq Pay; every release candidate still requires the device checklist below.
+Automated tests cover exact Luna parsing/storage, campaign gift encryption, one-per-device campaign allocation and idempotent retry, gift-key validation, Nimiq network mapping, device-local link and trail recovery, trail-data separation, sender recovery, storage-failure protection, opt-in analytics consent, unique-device deduplication, request throttling, CSP drift protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, actual first-open totals, keep/pass linkage, direct link-to-link gift relay, reporting, bounded analytics, fabricated-payment and raw-relay rejection, interrupted claim recovery, rebroadcast, and post-chain confirmation. The message-only UI, recent-link recovery, analytics preference, and Nimiq WebAssembly under production CSP are also verified through mobile-sized browser runs. Release acceptance included a real Testnet Send → Claim flow and native share/copy inside Nimiq Pay; every release candidate still requires the device checklist below.
 
 Chain impact labels are literal: “recipient links opened” counts a note's first successful retrieval, “notes created” counts stored notes, and “NIM attached” is the sum of the amount accompanying each note. A relayed gift genuinely moves link-to-link; the summed figure counts each stage it accompanies rather than claiming it is newly contributed each time.
 
@@ -79,6 +81,7 @@ Chain impact labels are literal: “recipient links opened” counts a note's fi
 - A settling claim temporarily stores its already-signed transaction—including the chosen destination address—for safe retry, then removes the raw copy after verified confirmation
 - Reporting permanently removes message text without blocking an attached gift claim
 - Optional product analytics are disabled until the user explicitly opts in; accepted events are stored only as bounded daily counters
+- The founder campaign stores browser-encrypted gift links and a keyed hash of the origin-scoped Nimiq Pay device identifier solely for fair, idempotent one-per-device distribution
 - Request size and field limits, prepared SQL, transaction verification, CSP, `no-referrer`, and no-store API responses reduce abuse and leakage risks
 - No leaderboard, streak, pressure language, or financial ranking
 

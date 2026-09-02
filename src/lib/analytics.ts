@@ -51,3 +51,24 @@ export function track(name: AnalyticsEvent): void {
     keepalive: true,
   }).catch(() => undefined)
 }
+
+export type DeviceCountResult = 'counted' | 'outside-pay' | 'declined'
+
+export async function registerAnonymousDevice(): Promise<DeviceCountResult> {
+  if (typeof window === 'undefined' || !window.nimiqPay) return 'outside-pay'
+  try {
+    const { requestDeviceIdentifier } = await import('@nimiq/mini-app-sdk')
+    const deviceId = await requestDeviceIdentifier({
+      reason: 'Count this device once in anonymous competition usage totals. No wallet address or message is shared.',
+    })
+    const response = await fetch('/api/usage/device', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ deviceId }),
+    })
+    if (!response.ok) throw new Error('The anonymous device count could not be saved.')
+    return 'counted'
+  } catch {
+    return 'declined'
+  }
+}

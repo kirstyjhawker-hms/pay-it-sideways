@@ -13,10 +13,15 @@
 
 - The server verifies the confirmed funding transaction's hash, recipient, and exact Luna value before creating a claimable gift record.
 - The server broadcasts a locally signed claim but records it as claimed only after an included transaction is fetched and its hash, sender, value, and execution result match the stored gift.
+- A pass signs the same constrained transaction to the next one-use gift account instead of a personal wallet. The next note is not saved until that relay is independently confirmed on-chain.
 - A client-generated recipient token makes creation idempotent. If a save response is interrupted after D1 commits, retrying returns the same link.
 - A funded draft is persisted locally before wallet confirmation and restored after reload. Once funded, the UI will not silently switch it to words-only.
 - The recent-links index contains only local recovery metadata, including the separate trail token and public funding receipt when present—not message text or wallet addresses. If both local and session storage reject a gift key, navigation stops with a retryable error rather than exposing an incomplete funded link.
 - Reporting erases the words but leaves an unclaimed gift reachable, preventing report abuse from stranding funds.
+- A sender who still has the locally stored complete link can reclaim an unclaimed gift through the normal recipient claim flow. This is recovery, not a revocation guarantee: whoever claims the bearer gift first controls it.
+- Write-heavy API routes are throttled with short-lived HMAC identifiers derived from Cloudflare's connecting address. Raw network addresses are not stored.
+- With explicit in-app consent, unique-device evidence stores only a second one-way hash of Nimiq Pay's origin-scoped device identifier.
+- Messages are stored server-side so the private bearer link can retrieve them. They are not end-to-end encrypted; link secrecy is the access boundary.
 
 ## Red-team cases covered
 

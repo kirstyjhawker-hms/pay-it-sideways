@@ -3,6 +3,7 @@ import { transactionHashOf, transactionMatches, type NimiqTransaction } from '..
 interface Env {
   DB: D1Database
   ASSETS: Fetcher
+  RATE_LIMIT_SECRET?: string
 }
 
 interface CreateSidewaysBody {
@@ -40,6 +41,7 @@ interface SidewaysRow {
   claimed_at: string | null
   status: string
   kept_at: string | null
+  first_opened_at: string | null
 }
 
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8' }
@@ -177,6 +179,53 @@ async function tokenHash(token: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+async function hmacHex(secret: string, value: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function enforceRateLimit(
+  request: Request,
+  env: Env,
+  scope: string,
+  maximum: number,
+  windowSeconds: number,
+): Promise<Response | null> {
+  const address = request.headers.get('cf-connecting-ip')
+  if (!address) return null
+  if (!env.RATE_LIMIT_SECRET) {
+    return json({ error: 'Abuse protection is temporarily unavailable. Please try again shortly.' }, 503)
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  const bucket = Math.floor(now / windowSeconds)
+  const key = await hmacHex(env.RATE_LIMIT_SECRET, `${scope}:${bucket}:${address}`)
+  const expiresAt = (bucket + 1) * windowSeconds
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM request_limits WHERE expires_at < ?').bind(now),
+    env.DB.prepare(`
+      INSERT INTO request_limits (request_key, request_count, expires_at)
+      VALUES (?, 1, ?)
+      ON CONFLICT(request_key) DO UPDATE SET request_count = request_count + 1
+    `).bind(key, expiresAt),
+  ])
+  const current = await env.DB.prepare(
+    'SELECT request_count FROM request_limits WHERE request_key = ?'
+  ).bind(key).first<{ request_count: number }>()
+  if (Number(current?.request_count ?? 0) <= maximum) return null
+
+  const response = json({ error: 'That action has been used unusually often. Please wait a little and try again.' }, 429)
+  response.headers.set('retry-after', String(Math.max(1, expiresAt - now)))
+  return response
+}
+
 function tokenFromPath(pathname: string, suffix = ''): string | null {
   const pattern = suffix
     ? new RegExp(`^/api/sideways/([^/]+)/${suffix}$`)
@@ -193,7 +242,8 @@ function trailTokenFromPath(pathname: string): string | null {
 }
 
 interface ChainStatsRow {
-  people_reached: number
+  links_opened: number
+  positive_messages: number
   message_only_passes: number
   nim_gift_count: number
   nim_passed_luna: number
@@ -204,7 +254,8 @@ interface ChainStatsRow {
 async function getChainStats(chainId: string, env: Env): Promise<ChainStatsRow | null> {
   return env.DB.prepare(`
     SELECT
-      COUNT(*) AS people_reached,
+      SUM(CASE WHEN first_opened_at IS NOT NULL THEN 1 ELSE 0 END) AS links_opened,
+      COUNT(*) AS positive_messages,
       SUM(CASE WHEN includes_payment = 0 THEN 1 ELSE 0 END) AS message_only_passes,
       SUM(CASE WHEN includes_payment = 1 THEN 1 ELSE 0 END) AS nim_gift_count,
       COALESCE(SUM(CASE WHEN includes_payment = 1 THEN payment_luna ELSE 0 END), 0) AS nim_passed_luna,
@@ -212,7 +263,7 @@ async function getChainStats(chainId: string, env: Env): Promise<ChainStatsRow |
       MAX(s.created_at) AS last_continued_at
     FROM sideways s
     INNER JOIN consents c ON c.sideways_id = s.id
-    WHERE s.chain_id = ? AND s.status = 'delivered' AND c.allow_aggregate_tracking = 1
+    WHERE s.chain_id = ? AND s.status IN ('delivered', 'reported') AND c.allow_aggregate_tracking = 1
   `).bind(chainId).first<ChainStatsRow>()
 }
 
@@ -364,7 +415,8 @@ async function getSideways(token: string, env: Env): Promise<Response> {
       positive_message, includes_payment, payment_currency, payment_amount,
       payment_luna,
       transaction_hash, payment_mode, payment_network, gift_address,
-      claim_transaction_hash, pending_claim_transaction_hash, claimed_at, status, kept_at
+      claim_transaction_hash, pending_claim_transaction_hash, claimed_at, status, kept_at,
+      first_opened_at
     FROM sideways WHERE recipient_token_hash = ?
   `).bind(hash).first<SidewaysRow>()
 
@@ -374,11 +426,15 @@ async function getSideways(token: string, env: Env): Promise<Response> {
     return json({ error: 'This message is no longer available.' }, 410)
   }
 
+  await env.DB.prepare(
+    'UPDATE sideways SET first_opened_at = ? WHERE id = ? AND first_opened_at IS NULL'
+  ).bind(new Date().toISOString(), sideways.id).run()
+
   const stats = await getChainStats(sideways.chain_id, env)
 
   const position = await env.DB.prepare(`
     SELECT COUNT(*) AS position FROM sideways
-    WHERE chain_id = ? AND status = 'delivered' AND created_at <= ?
+    WHERE chain_id = ? AND status IN ('delivered', 'reported') AND created_at <= ?
   `).bind(sideways.chain_id, sideways.created_at).first<{ position: number }>()
 
   return json({
@@ -399,8 +455,8 @@ async function getSideways(token: string, env: Env): Promise<Response> {
       kept: Boolean(sideways.kept_at),
     },
     chain: {
-      peopleReached: Number(stats?.people_reached ?? 1),
-      positiveMessages: Number(stats?.people_reached ?? 1),
+      linksOpened: Number(stats?.links_opened ?? 1),
+      positiveMessages: Number(stats?.positive_messages ?? 1),
       messageOnlyPasses: Number(stats?.message_only_passes ?? 1),
       nimPassed: Number(stats?.nim_passed_luna ?? 0) / 100_000,
       position: Number(position?.position ?? 1),
@@ -417,11 +473,11 @@ async function getTrail(token: string, env: Env): Promise<Response> {
   if (!access) return json({ error: 'This private trail could not be found.' }, 404)
 
   const stats = await getChainStats(access.chain_id, env)
-  if (!stats?.people_reached) return json({ error: 'This private trail could not be found.' }, 404)
+  if (!stats?.positive_messages) return json({ error: 'This private trail could not be found.' }, 404)
   return json({
     chain: {
-      peopleReached: Number(stats.people_reached),
-      positiveMessages: Number(stats.people_reached),
+      linksOpened: Number(stats.links_opened),
+      positiveMessages: Number(stats.positive_messages),
       messageOnlyPasses: Number(stats.message_only_passes),
       nimGiftCount: Number(stats.nim_gift_count),
       nimPassed: Number(stats.nim_passed_luna) / 100_000,
@@ -710,9 +766,32 @@ async function reportSideways(token: string, env: Env): Promise<Response> {
   return json({ reported: true })
 }
 
+async function registerDevice(request: Request, env: Env): Promise<Response> {
+  let deviceId: unknown
+  try {
+    const body = await readSmallJson<{ deviceId?: unknown }>(request, 1024)
+    deviceId = body.deviceId
+  } catch {
+    return json({ error: 'That anonymous device count could not be read.' }, 400)
+  }
+  if (typeof deviceId !== 'string' || !/^[a-f0-9]{64}$/i.test(deviceId)) {
+    return json({ error: 'That anonymous device identifier is not valid.' }, 422)
+  }
+  const storedHash = await tokenHash(`device:${deviceId.toLowerCase()}`)
+  const now = new Date().toISOString()
+  await env.DB.prepare(`
+    INSERT INTO analytics_devices (device_id_hash, first_seen_at, last_seen_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(device_id_hash) DO UPDATE SET last_seen_at = excluded.last_seen_at
+  `).bind(storedHash, now, now).run()
+  return json({ counted: true })
+}
+
 async function handleApi(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
   if (request.method === 'POST' && url.pathname === '/api/events') {
+    const limited = await enforceRateLimit(request, env, 'events', 120, 3_600)
+    if (limited) return limited
     let name: unknown
     try {
       const body = await readSmallJson<{ name?: unknown }>(request, 1024)
@@ -731,33 +810,63 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     `).bind(name, new Date().toISOString().slice(0, 10)).run()
     return withSecurityHeaders(new Response(null, { status: 204 }), true)
   }
+  if (request.method === 'POST' && url.pathname === '/api/usage/device') {
+    const limited = await enforceRateLimit(request, env, 'device', 10, 3_600)
+    if (limited) return limited
+    return registerDevice(request, env)
+  }
   if (request.method === 'POST' && url.pathname === '/api/sideways') {
+    const limited = await enforceRateLimit(request, env, 'create', 20, 3_600)
+    if (limited) return limited
     return createSideways(request, env)
   }
   if (request.method === 'POST' && url.pathname === '/api/nimiq/detect-network') {
+    const limited = await enforceRateLimit(request, env, 'network-detect', 60, 3_600)
+    if (limited) return limited
     return detectNimiqNetwork(request)
   }
 
   const trailToken = trailTokenFromPath(url.pathname)
-  if (request.method === 'GET' && trailToken) return getTrail(trailToken, env)
+  if (request.method === 'GET' && trailToken) {
+    const limited = await enforceRateLimit(request, env, 'trail', 300, 3_600)
+    return limited || getTrail(trailToken, env)
+  }
 
   const keepToken = tokenFromPath(url.pathname, 'keep')
-  if (request.method === 'POST' && keepToken) return keepSideways(keepToken, env)
+  if (request.method === 'POST' && keepToken) {
+    const limited = await enforceRateLimit(request, env, 'keep', 60, 3_600)
+    return limited || keepSideways(keepToken, env)
+  }
 
   const balanceToken = tokenFromPath(url.pathname, 'gift-balance')
-  if (request.method === 'GET' && balanceToken) return getGiftBalance(balanceToken, env)
+  if (request.method === 'GET' && balanceToken) {
+    const limited = await enforceRateLimit(request, env, 'gift-balance', 180, 3_600)
+    return limited || getGiftBalance(balanceToken, env)
+  }
 
   const claimToken = tokenFromPath(url.pathname, 'claim')
-  if (request.method === 'POST' && claimToken) return claimGift(request, claimToken, env)
+  if (request.method === 'POST' && claimToken) {
+    const limited = await enforceRateLimit(request, env, 'claim', 60, 3_600)
+    return limited || claimGift(request, claimToken, env)
+  }
 
   const confirmClaimToken = tokenFromPath(url.pathname, 'claim-confirm')
-  if (request.method === 'POST' && confirmClaimToken) return confirmGiftClaim(request, confirmClaimToken, env)
+  if (request.method === 'POST' && confirmClaimToken) {
+    const limited = await enforceRateLimit(request, env, 'claim-confirm', 120, 3_600)
+    return limited || confirmGiftClaim(request, confirmClaimToken, env)
+  }
 
   const reportToken = tokenFromPath(url.pathname, 'report')
-  if (request.method === 'POST' && reportToken) return reportSideways(reportToken, env)
+  if (request.method === 'POST' && reportToken) {
+    const limited = await enforceRateLimit(request, env, 'report', 20, 3_600)
+    return limited || reportSideways(reportToken, env)
+  }
 
   const token = tokenFromPath(url.pathname)
-  if (request.method === 'GET' && token) return getSideways(token, env)
+  if (request.method === 'GET' && token) {
+    const limited = await enforceRateLimit(request, env, 'open', 300, 3_600)
+    return limited || getSideways(token, env)
+  }
 
   return json({ error: 'Not found.' }, 404)
 }

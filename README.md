@@ -8,7 +8,7 @@ Pay It Sideways is a mobile-first Nimiq Pay Mini App for sending a genuine, priv
 
 ## Why Nimiq is integral
 
-The optional gift is funded by a real NIM transaction confirmed inside Nimiq Pay. The sender does not need the recipient's wallet address: the app generates a one-use gift account, Nimiq Pay funds it, and the complete private link lets the recipient claim to an account they select. Passing it on creates a new message and, only if chosen, a new transaction. Pay It Sideways never receives or controls the private key and never custodies funds. A recent-links screen can reconstruct sent links on the original device without storing the note's words in that index.
+The optional gift is funded by a real NIM transaction confirmed inside Nimiq Pay. The sender does not need the recipient's wallet address: the app generates a one-use gift account, Nimiq Pay funds it, and the complete private link lets the recipient claim to an account they select or relay that exact gift into the next one-use account. Pay It Sideways never receives the private key and never custodies funds. A recent-links screen can reconstruct sent links and a separate private sender trail on the original device without storing the note's words in either index.
 
 This is an app-specific bearer gift, similar in principle to a Nimiq Cashlink. Anyone with the complete link can claim an unclaimed gift, so it must be shared privately.
 
@@ -17,7 +17,7 @@ This is an app-specific bearer gift, similar in principle to a Nimiq Cashlink. A
 1. Write why someone came to mind and what you want them to hear.
 2. Send words only, or fund a private NIM gift through Nimiq Pay.
 3. Share one private recipient link—no recipient address is required.
-4. The recipient keeps the message/gift or starts a separate new act in the chain; received NIM is never forwarded.
+4. The recipient keeps the message/gift or relays that exact gift directly into the next private link. Pay It Sideways never holds the funds. After keeping a gift, they can still start a separate note with any amount or words only.
 5. A private sender trail shows anonymous totals, never messages, names, recipient choices, or wallet addresses.
 
 ## Stack and architecture
@@ -58,7 +58,9 @@ npm run build
 npm audit --audit-level=high
 ```
 
-The 30 automated tests cover exact Luna parsing/storage, gift-key validation, Nimiq network mapping, device-local link and trail recovery, trail-data separation, storage-failure protection, opt-in analytics consent, CSP drift protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, fabricated-payment and raw-relay rejection, interrupted claim recovery, rebroadcast, and post-chain confirmation. The message-only UI, recent-link recovery, analytics preference, and Nimiq WebAssembly under production CSP are also verified through mobile-sized browser runs. Release acceptance included a real Testnet Send → Claim → Pass run and native share/copy inside Nimiq Pay.
+Automated tests cover exact Luna parsing/storage, gift-key validation, Nimiq network mapping, device-local link and trail recovery, trail-data separation, sender recovery, storage-failure protection, opt-in analytics consent, unique-device deduplication, request throttling, CSP drift protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, actual first-open totals, keep/pass linkage, direct link-to-link gift relay, reporting, bounded analytics, fabricated-payment and raw-relay rejection, interrupted claim recovery, rebroadcast, and post-chain confirmation. The message-only UI, recent-link recovery, analytics preference, and Nimiq WebAssembly under production CSP are also verified through mobile-sized browser runs. Release acceptance included a real Testnet Send → Claim flow and native share/copy inside Nimiq Pay; every release candidate still requires the device checklist below.
+
+Chain impact labels are literal: “recipient links opened” counts a note's first successful retrieval, “notes created” counts stored notes, and “NIM attached” is the sum of the amount accompanying each note. A relayed gift genuinely moves link-to-link; the summed figure counts each stage it accompanies rather than claiming it is newly contributed each time.
 
 ## Deployment
 

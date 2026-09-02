@@ -10,12 +10,14 @@ const fundingHash = 'a'.repeat(64)
 const secondFundingHash = 'd'.repeat(64)
 const claimHash = 'b'.repeat(64)
 const replacementClaimHash = 'e'.repeat(64)
+const relayHash = 'f'.repeat(64)
 const unrelatedHash = 'c'.repeat(64)
 const giftAddress = 'NQ32 64N4 02FC 6Q59 RV16 0MM4 HCDD X6KL SNN4'
 const secondGiftAddress = 'NQ22 GBGD Q7P1 EMMT R44A 4Q0B XS3B 0JSH 7RR7'
 const destination = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000'
 const serializedClaim = 'ab'.repeat(100)
 const replacementSerializedClaim = 'ef'.repeat(100)
+const relaySerializedClaim = 'fa'.repeat(100)
 const unrelatedSerializedClaim = 'cd'.repeat(100)
 
 function request(path: string, init?: RequestInit): Request {
@@ -34,6 +36,13 @@ function post(body?: unknown): RequestInit {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
+  }
+}
+
+function postFrom(body: unknown, address: string): RequestInit {
+  return {
+    ...post(body),
+    headers: { 'content-type': 'application/json', 'cf-connecting-ip': address },
   }
 }
 
@@ -64,7 +73,7 @@ describe('Worker API', () => {
     const received = await dispatch(`/api/sideways/${token}`)
     expect(await received.json()).toMatchObject({
       sideways: { message: body.message, reported: false, includesPayment: false },
-      chain: { peopleReached: 1, messageOnlyPasses: 1, position: 1 },
+      chain: { linksOpened: 1, messageOnlyPasses: 1, position: 1 },
     })
 
     expect((await dispatch(`/api/sideways/${token}/keep`, post())).status).toBe(200)
@@ -82,13 +91,13 @@ describe('Worker API', () => {
 
     const childView = await dispatch(`/api/sideways/${childToken}`)
     expect(await childView.json()).toMatchObject({
-      chain: { peopleReached: 2, positiveMessages: 2, messageOnlyPasses: 2, position: 2 },
+      chain: { linksOpened: 2, positiveMessages: 2, messageOnlyPasses: 2, position: 2 },
     })
 
     const trailView = await dispatch(`/api/trails/${trailToken}`)
     expect(await trailView.json()).toMatchObject({
       chain: {
-        peopleReached: 2,
+        linksOpened: 2,
         positiveMessages: 2,
         messageOnlyPasses: 2,
         nimGiftCount: 0,
@@ -119,6 +128,37 @@ describe('Worker API', () => {
     expect(oversized.status).toBe(413)
   })
 
+  it('counts consented devices once and throttles automated note spam', async () => {
+    const deviceId = '1'.repeat(64)
+    const firstCount = await dispatch('/api/usage/device', postFrom({ deviceId }, '203.0.113.10'))
+    const secondCount = await dispatch('/api/usage/device', postFrom({ deviceId }, '203.0.113.10'))
+    expect(firstCount.status).toBe(200)
+    expect(secondCount.status).toBe(200)
+    const devices = await env.DB.prepare('SELECT COUNT(*) AS total FROM analytics_devices').first<{ total: number }>()
+    expect(devices?.total).toBe(1)
+    expect((await dispatch('/api/usage/device', postFrom({ deviceId: 'bad' }, '203.0.113.11'))).status).toBe(422)
+
+    for (let index = 0; index < 20; index += 1) {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'
+      const token = `${alphabet[index]}${'Z'.repeat(42)}`
+      const created = await dispatch('/api/sideways', postFrom({
+        recipientToken: token,
+        trailToken: `${alphabet[index]}${'Q'.repeat(42)}`,
+        reason: 'A legitimate kindness reason.',
+        message: 'A legitimate positive message long enough to save.',
+      }, '203.0.113.20'))
+      expect(created.status).toBe(201)
+    }
+    const blocked = await dispatch('/api/sideways', postFrom({
+      recipientToken: `u${'Y'.repeat(42)}`,
+      trailToken: `v${'Y'.repeat(42)}`,
+      reason: 'This request exceeds the hourly limit.',
+      message: 'Automated floods should not consume unlimited storage.',
+    }, '203.0.113.20'))
+    expect(blocked.status).toBe(429)
+    expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0)
+  })
+
   it('verifies funding and claims before changing financial state', async () => {
     let broadcasts = 0
     let broadcastFails = true
@@ -140,6 +180,8 @@ describe('Worker API', () => {
           })
         } else if (hash === replacementClaimHash) {
           data = { hash, from: giftAddress, to: destination, value: 100_000, executionResult: true }
+        } else if (hash === relayHash) {
+          data = { hash, from: secondGiftAddress, to: giftAddress, value: 20_000, executionResult: true }
         } else {
           data = { hash, from: destination, to: giftAddress, value: 100_000, executionResult: true }
         }
@@ -152,12 +194,16 @@ describe('Worker API', () => {
         data = {
           hash: serialized === serializedClaim
             ? claimHash
-            : serialized === replacementSerializedClaim ? replacementClaimHash : unrelatedHash,
-          from: serialized === serializedClaim || serialized === replacementSerializedClaim ? giftAddress : destination,
-          to: destination,
+            : serialized === replacementSerializedClaim
+              ? replacementClaimHash
+              : serialized === relaySerializedClaim ? relayHash : unrelatedHash,
+          from: serialized === relaySerializedClaim
+            ? secondGiftAddress
+            : serialized === serializedClaim || serialized === replacementSerializedClaim ? giftAddress : destination,
+          to: serialized === relaySerializedClaim ? giftAddress : destination,
           fromType: 0,
           toType: 0,
-          value: 100_000,
+          value: serialized === relaySerializedClaim ? 20_000 : 100_000,
           fee: 0,
           senderData: '',
           recipientData: '',
@@ -170,7 +216,9 @@ describe('Worker API', () => {
         if (broadcastFails) {
           return HttpResponse.json({ jsonrpc: '2.0', id: rpc.id, error: { message: 'Temporary broadcast failure' } })
         }
-        data = String(rpc.params[0]) === replacementSerializedClaim ? replacementClaimHash : claimHash
+        data = String(rpc.params[0]) === replacementSerializedClaim
+          ? replacementClaimHash
+          : String(rpc.params[0]) === relaySerializedClaim ? relayHash : claimHash
       } else {
         return HttpResponse.json({ jsonrpc: '2.0', id: rpc.id, error: { message: 'Unexpected method' } })
       }
@@ -214,11 +262,11 @@ describe('Worker API', () => {
     expect(paidChild.status).toBe(201)
     const paidChildView = await dispatch(`/api/sideways/${paidChildToken}`)
     expect(await paidChildView.json()).toMatchObject({
-      chain: { peopleReached: 2, nimPassed: 1.2 },
+      chain: { linksOpened: 1, nimPassed: 1.2 },
     })
     const paidTrail = await dispatch(`/api/trails/${trailToken}`)
     expect(await paidTrail.json()).toMatchObject({
-      chain: { peopleReached: 2, nimGiftCount: 2, nimPassed: 1.2 },
+      chain: { linksOpened: 1, nimGiftCount: 2, nimPassed: 1.2 },
     })
 
     const legacyDirect = await dispatch('/api/sideways', post({
@@ -300,6 +348,35 @@ describe('Worker API', () => {
     })
     const confirmedRetry = await dispatch(`/api/sideways/${token}/claim`, post({}))
     expect(await confirmedRetry.json()).toEqual({ transactionHash: replacementClaimHash })
+
+    const relay = await dispatch(`/api/sideways/${paidChildToken}/claim`, post({
+      serializedTransaction: relaySerializedClaim,
+    }))
+    expect(relay.status).toBe(200)
+    expect(await relay.json()).toEqual({ transactionHash: relayHash })
+    const relayConfirmation = await dispatch(`/api/sideways/${paidChildToken}/claim-confirm`, post({
+      transactionHash: relayHash,
+    }))
+    expect(relayConfirmation.status).toBe(200)
+    const relayedToken = 'K'.repeat(43)
+    const relayedChild = await dispatch('/api/sideways', post({
+      recipientToken: relayedToken,
+      trailToken: 'R'.repeat(43),
+      parentToken: paidChildToken,
+      reason: 'The same gift keeps travelling.',
+      message: 'This gift moved directly between two private links.',
+      includesPayment: true,
+      paymentLuna: 20_000,
+      transactionHash: relayHash,
+      paymentMode: 'claimable',
+      paymentNetwork: 'test',
+      giftAddress,
+    }))
+    expect(relayedChild.status).toBe(201)
+    const relayedView = await dispatch(`/api/sideways/${relayedToken}`)
+    expect(await relayedView.json()).toMatchObject({
+      chain: { linksOpened: 3, positiveMessages: 3, nimPassed: 1.4, position: 3 },
+    })
 
     const mismatch = await dispatch('/api/sideways', post({
       recipientToken: 'H'.repeat(43),

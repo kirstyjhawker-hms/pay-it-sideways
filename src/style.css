@@ -466,6 +466,9 @@ textarea:focus, input:focus { border-color: rgba(53, 97, 84, 0.6); background: v
 .report-confirm p { margin: 0 0 10px; font-size: 0.78rem; }
 .report-confirm button { min-height: 44px; margin: 0 5px; border: 0; background: none; cursor: pointer; font-size: 0.76rem; font-weight: 700; }
 .report-confirm button:first-of-type { color: var(--danger); }
+.pass-explainer { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,0.5); color: var(--ink-soft); font-size: 0.78rem; line-height: 1.55; }
+.history-actions { display: grid; justify-items: stretch; gap: 8px; }
+.reclaim-link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; color: var(--danger); font-size: 0.74rem; font-weight: 750; text-decoration: underline; text-underline-offset: 3px; }
 .error-message { color: var(--danger); font-size: 0.82rem; line-height: 1.5; text-align: center; }
 
 .site-footer { display: flex; width: min(100%, 676px); min-height: 58px; align-items: center; justify-content: center; gap: 7px; margin: 0 auto; padding: 14px 22px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); color: var(--muted); font-size: 0.68rem; text-align: center; }

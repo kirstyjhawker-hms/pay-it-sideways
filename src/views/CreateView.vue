@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { createSideways, detectNimiqNetwork } from '../lib/api'
+import { broadcastGiftClaim, confirmGiftClaim, createSideways, detectNimiqNetwork, getGiftState, getSideways } from '../lib/api'
 import { getNimiqProvider } from '../lib/nimiq'
-import { generateGiftKey, type GiftKey, type NimiqNetwork } from '../lib/gift'
+import { createClaimTransaction, generateGiftKey, giftSecretFromHash, type GiftKey, type NimiqNetwork } from '../lib/gift'
 import { parseNimToLuna } from '../lib/money'
 import { track } from '../lib/analytics'
 import { saveGiftSecret, saveSentLink } from '../lib/sentLinks'
@@ -21,6 +21,7 @@ interface PendingGift {
   giftKey: GiftKey
   transactionHash?: string
   network?: NimiqNetwork
+  carryGift?: boolean
 }
 
 const pendingGiftKey = 'pay-it-sideways:pending-gift'
@@ -36,7 +37,8 @@ const router = useRouter()
 const step = ref(1)
 const reason = ref('')
 const message = ref('')
-const paymentChoice = ref<PaymentChoice>('words')
+const isCarryingGift = computed(() => route.query.carry === 'gift' && typeof route.query.parent === 'string')
+const paymentChoice = ref<PaymentChoice>(isCarryingGift.value ? 'nim' : 'words')
 const nimAmount = ref(typeof route.query.amount === 'string' ? route.query.amount : '1')
 const submissionState = ref<SubmissionState>('idle')
 const completedTransaction = ref<string>()
@@ -76,6 +78,7 @@ function persistPendingGift(): void {
     giftKey: giftKey.value,
     transactionHash: completedTransaction.value,
     network: giftNetwork.value,
+    carryGift: isCarryingGift.value,
   }
   try {
     localStorage.setItem(pendingGiftKey, JSON.stringify(pending))
@@ -95,6 +98,9 @@ onMounted(() => {
     if (!raw) return
     const pending = JSON.parse(raw) as Partial<PendingGift>
     if (!pending.giftKey?.secret || !pending.giftKey.address || !pending.reason || !pending.message || !pending.nimAmount || !pending.recipientToken) return
+    if ((pending.parentToken || undefined) !== parentToken.value
+      || (pending.carryGift === true) !== isCarryingGift.value
+    ) return
     reason.value = pending.reason
     message.value = pending.message
     nimAmount.value = pending.nimAmount
@@ -133,6 +139,7 @@ function useStarter(starter: string): void {
 }
 
 function choosePayment(choice: PaymentChoice): void {
+  if (isCarryingGift.value) return
   if (completedTransaction.value && choice === 'words') {
     errorMessage.value = 'This NIM has already funded its private gift. Finish saving the link so the money is not stranded.'
     return
@@ -175,6 +182,47 @@ async function sendNim(): Promise<string> {
   return result
 }
 
+async function carryGiftForward(): Promise<string> {
+  if (!parentToken.value) throw new Error('The original private link is missing.')
+  const sourceSecret = giftSecretFromHash()
+  if (!sourceSecret) throw new Error('The original private gift key is missing. Go back and reopen the complete link.')
+  const [parent, state] = await Promise.all([
+    getSideways(parentToken.value),
+    getGiftState(parentToken.value),
+  ])
+  if (parent.sideways.claimed) throw new Error('That gift has already been claimed and cannot be passed again.')
+  if (parent.sideways.paymentMode !== 'claimable' || !parent.sideways.paymentNetwork || typeof parent.sideways.paymentAmount !== 'number') {
+    throw new Error('That note does not contain a gift that can be passed forward.')
+  }
+  const value = Math.round(parent.sideways.paymentAmount * 100_000)
+  if (state.balance === null || state.balance < value || state.blockNumber === null) {
+    throw new Error('The original gift is not ready to pass. It may still be settling; please try again shortly.')
+  }
+  giftKey.value ??= await generateGiftKey()
+  giftNetwork.value = parent.sideways.paymentNetwork
+  nimAmount.value = String(parent.sideways.paymentAmount)
+  persistPendingGift()
+  const claim = await createClaimTransaction({
+    secret: sourceSecret,
+    recipient: giftKey.value.address,
+    value,
+    validityStartHeight: state.blockNumber,
+    network: giftNetwork.value,
+  })
+  const transactionHash = await broadcastGiftClaim({
+    token: parentToken.value,
+    serializedTransaction: claim.serialized,
+  })
+  completedTransaction.value = transactionHash
+  persistPendingGift()
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    const result = await confirmGiftClaim({ token: parentToken.value, transactionHash })
+    if (result.confirmed) return transactionHash
+    await new Promise((resolve) => window.setTimeout(resolve, 1_000))
+  }
+  throw new Error('The pass is safely recorded and still settling. Tap below to retry; the gift will not move twice.')
+}
+
 async function findPaymentNetwork(transactionHash: string): Promise<NimiqNetwork> {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const network = await detectNimiqNetwork(transactionHash)
@@ -189,11 +237,20 @@ async function submit(): Promise<void> {
   errorMessage.value = ''
 
   try {
+    if (isCarryingGift.value && completedTransaction.value && parentToken.value) {
+      const result = await confirmGiftClaim({
+        token: parentToken.value,
+        transactionHash: completedTransaction.value,
+      })
+      if (!result.confirmed) {
+        throw new Error('The pass is safely recorded and still settling. Tap below to retry; the gift will not move twice.')
+      }
+    }
     if (paymentChoice.value === 'nim' && !completedTransaction.value) {
       submissionState.value = 'confirming'
-      completedTransaction.value = await sendNim()
+      completedTransaction.value = isCarryingGift.value ? await carryGiftForward() : await sendNim()
     }
-    if (paymentChoice.value === 'nim' && completedTransaction.value && !giftNetwork.value) {
+    if (paymentChoice.value === 'nim' && completedTransaction.value && !giftNetwork.value && !isCarryingGift.value) {
       submissionState.value = 'saving'
       giftNetwork.value = await findPaymentNetwork(completedTransaction.value)
       persistPendingGift()
@@ -278,10 +335,15 @@ async function submit(): Promise<void> {
 
       <section v-else-if="step === 2" key="payment" class="flow-card" aria-labelledby="payment-title">
         <p class="eyebrow">The words already count</p>
-        <h1 id="payment-title">Add a little something?</h1>
-        <p class="supporting">{{ isContinuation ? 'Start a fresh act with words only or a new NIM gift. What you received stays yours.' : 'Completely optional. The message is the heart of this.' }}</p>
+        <h1 id="payment-title">{{ isCarryingGift ? 'Pass the gift with it?' : 'Add a little something?' }}</h1>
+        <p class="supporting">{{ isCarryingGift ? 'This exact gift will move directly into the next private link. It never passes through your wallet or Pay It Sideways.' : isContinuation ? 'This is a new note: add any amount you choose, or just your words.' : 'Completely optional. The message is the heart of this.' }}</p>
 
-        <div class="payment-choices">
+        <div v-if="isCarryingGift" class="words-choice">
+          <span class="nim-symbol" aria-hidden="true">N</span>
+          <div><strong>Carry {{ nimAmount }} NIM forward</strong><p>The same gift, not a new payment.</p></div>
+          <span class="choice-check" aria-hidden="true">✓</span>
+        </div>
+        <div v-else class="payment-choices">
           <button type="button" :class="{ selected: paymentChoice === 'words' }" :aria-pressed="paymentChoice === 'words'" @click="choosePayment('words')">
             <span aria-hidden="true">💌</span><div><strong>Words are enough</strong><p>Send the note with no payment.</p></div><i aria-hidden="true">{{ paymentChoice === 'words' ? '✓' : '' }}</i>
           </button>
@@ -290,7 +352,7 @@ async function submit(): Promise<void> {
           </button>
         </div>
 
-        <div v-if="paymentChoice === 'nim'" class="payment-fields">
+        <div v-if="paymentChoice === 'nim' && !isCarryingGift" class="payment-fields">
           <div class="amount-presets" aria-label="Choose a NIM amount">
             <button v-for="amount in ['0.5', '1', '2', '5']" :key="amount" type="button" :class="{ selected: nimAmount === amount }" @click="nimAmount = amount">{{ amount }} NIM</button>
           </div>
@@ -312,7 +374,7 @@ async function submit(): Promise<void> {
           <span v-else class="nim-symbol" aria-hidden="true">N</span>
           <div>
             <strong>{{ paymentChoice === 'words' ? 'Words are enough' : `${nimAmount} NIM comes with it` }}</strong>
-            <p>{{ paymentChoice === 'words' ? 'No payment attached. Every word still counts.' : 'Nimiq Pay will fund a private, one-use gift link.' }}</p>
+            <p>{{ paymentChoice === 'words' ? 'No payment attached. Every word still counts.' : isCarryingGift ? 'The same gift moves directly from the previous private link into this new one.' : 'Nimiq Pay will fund a private, one-use gift link.' }}</p>
           </div>
           <span class="choice-check" aria-hidden="true">✓</span>
         </div>
@@ -320,7 +382,7 @@ async function submit(): Promise<void> {
         <p class="privacy-note">The message stays private to anyone with its unguessable link. Anonymous totals let you watch its trail later—never the words, wallets, or recipient choices.</p>
         <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
         <button class="button button--primary button--wide" type="button" :disabled="submitting" @click="submit">
-          <span v-if="submissionState === 'confirming'">Confirm in Nimiq Pay…</span>
+          <span v-if="submissionState === 'confirming'">{{ isCarryingGift ? 'Moving the gift securely…' : 'Confirm in Nimiq Pay…' }}</span>
           <span v-else-if="submissionState === 'saving'">Making the private link…</span>
           <span v-else-if="completedTransaction">Retry saving the link <span aria-hidden="true">→</span></span>
           <span v-else>Send it sideways <span aria-hidden="true">→</span></span>

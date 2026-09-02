@@ -1,14 +1,31 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { analyticsConsent, setAnalyticsConsent, track } from '../lib/analytics'
+import { analyticsConsent, registerAnonymousDevice, setAnalyticsConsent, track } from '../lib/analytics'
 
 const analyticsChoice = ref<boolean | null>(analyticsConsent())
-const analyticsSaved = ref(false)
+const analyticsStatus = ref('')
 
-function chooseAnalytics(allowed: boolean): void {
-  analyticsSaved.value = setAnalyticsConsent(allowed)
-  analyticsChoice.value = analyticsSaved.value ? allowed : null
-  if (allowed && analyticsSaved.value) track('app_open')
+async function chooseAnalytics(allowed: boolean): Promise<void> {
+  const saved = setAnalyticsConsent(allowed)
+  analyticsChoice.value = saved ? allowed : null
+  if (!saved) {
+    analyticsStatus.value = 'This browser could not save that preference.'
+    return
+  }
+  if (!allowed) {
+    analyticsStatus.value = 'Anonymous counts are off on this device.'
+    return
+  }
+  track('app_open')
+  analyticsStatus.value = 'Anonymous action counts are on.'
+  const deviceResult = await registerAnonymousDevice()
+  if (deviceResult === 'counted') {
+    analyticsStatus.value = 'Anonymous counts are on, and this Nimiq Pay device has been counted once.'
+  } else if (deviceResult === 'outside-pay') {
+    analyticsStatus.value = 'Anonymous action counts are on. Open this page in Nimiq Pay if you also want this device counted once.'
+  } else {
+    analyticsStatus.value = 'Anonymous action counts are on. The optional one-device count was not allowed; nothing else was affected.'
+  }
 }
 </script>
 
@@ -22,7 +39,7 @@ function chooseAnalytics(allowed: boolean): void {
 
     <section class="about-section" aria-labelledby="about-title">
       <h2 id="about-title">About</h2>
-      <p><strong>Pay It Sideways</strong> lets you send someone a genuine note of appreciation, optionally with claimable NIM in the same private link. You never need to ask for their wallet address.</p>
+      <p><strong>Pay It Sideways</strong> lets you send someone a genuine note of appreciation, optionally with claimable NIM in the same private link. You never need to ask for their wallet address. A recipient can claim the gift or relay that exact gift directly into the next private link without Pay It Sideways holding it.</p>
       <p class="about-callout">There is never an obligation to continue a chain or attach money. Message-only participation is complete participation.</p>
     </section>
 
@@ -51,7 +68,8 @@ function chooseAnalytics(allowed: boolean): void {
       <h3>Retention</h3>
       <p>A private message remains available until its recipient reports it; there is no automatic expiry in this competition release. Reporting removes the words but retains non-content chain and transaction integrity data. Public blockchain transactions cannot be erased by this app.</p>
       <h3>Analytics</h3>
-      <p>Optional analytics count only basic product actions, grouped by day. They contain no message text, recipient references, wallet addresses, transaction identifiers, cookies, or advertising trackers. Analytics are off unless you choose to allow them.</p>
+      <p>Optional analytics count only basic product actions, grouped by day. With separate consent inside Nimiq Pay, they can also count a device once using a one-way hash of Nimiq Pay’s per-site device identifier. They contain no message text, recipient references, wallet addresses, transaction identifiers, cookies, or advertising trackers. Analytics are off unless you choose to allow them.</p>
+      <p>To reduce spam and protect availability, write-heavy requests are limited per hour using a short-lived keyed hash of the connecting network address. The raw address is not stored, and the hash is not used for advertising or a long-term profile.</p>
       <details class="analytics-details">
         <summary>See the exact events counted</summary>
         <p>App opened; creation started; message completed; payment option selected; Sideways created; sharing started; recipient opened; recipient kept; continuation started or completed; words-only used; payment used.</p>
@@ -61,7 +79,7 @@ function chooseAnalytics(allowed: boolean): void {
         <button type="button" :class="{ selected: analyticsChoice === true }" :aria-pressed="analyticsChoice === true" @click="chooseAnalytics(true)">Allow anonymous counts</button>
         <button type="button" :class="{ selected: analyticsChoice === false }" :aria-pressed="analyticsChoice === false" @click="chooseAnalytics(false)">No thanks</button>
       </fieldset>
-      <p v-if="analyticsSaved" class="success-message" role="status">Your analytics preference is saved on this device.</p>
+      <p v-if="analyticsStatus" class="success-message" role="status">{{ analyticsStatus }}</p>
     </section>
 
     <section class="about-section" aria-labelledby="terms-title">
@@ -70,7 +88,7 @@ function chooseAnalytics(allowed: boolean): void {
         <li>Use the app only for lawful, respectful messages to people you know.</li>
         <li>Do not use it for harassment, threats, impersonation, spam, or unwanted financial solicitation.</li>
         <li>Funding and claiming NIM gifts creates final public blockchain transactions. Check the amount carefully before confirming.</li>
-        <li>An attached gift is held by a temporary, one-use Nimiq account controlled by the complete private link—not by Pay It Sideways.</li>
+        <li>An attached gift is held by a temporary, one-use Nimiq account controlled by the complete private link—not by Pay It Sideways. Passing relays it to the next link’s one-use account; it is not custodial escrow.</li>
         <li>Anyone with the complete recipient link can control an unclaimed gift. Pay It Sideways cannot recover a lost, leaked, or incorrectly shared link.</li>
         <li>A recipient may report a message, which removes it from the recipient link.</li>
       </ul>

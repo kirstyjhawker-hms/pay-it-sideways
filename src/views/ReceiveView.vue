@@ -38,9 +38,6 @@ const needsGiftClaim = computed(() => isClaimableGift.value && !data.value?.side
 const keepLabel = computed(() => needsGiftClaim.value
   ? `Claim ${data.value?.sideways.paymentAmount} NIM & keep this`
   : t('keep'))
-const freshLabel = computed(() => needsGiftClaim.value
-  ? 'Claim yours, then start fresh'
-  : t('fresh'))
 const giftIsReady = computed(() => {
   const amount = data.value?.sideways.paymentAmount
   return typeof giftBalance.value === 'number'
@@ -241,6 +238,15 @@ async function passSideways(): Promise<void> {
   claimingFor.value = 'pass'
   errorMessage.value = ''
   try {
+    if (isClaimableGift.value && !data.value?.sideways.claimed) {
+      track('continuation_started')
+      await router.push({
+        name: 'create',
+        query: { parent: token.value, amount: String(data.value?.sideways.paymentAmount), carry: 'gift' },
+        hash: route.hash,
+      })
+      return
+    }
     const result = await claimGift()
     if (result !== 'claimed') return
     await finishAction('pass')
@@ -341,14 +347,15 @@ async function report(): Promise<void> {
       </section>
 
       <section v-if="!kept && !selectingAccount" class="receive-actions" aria-label="What would you like to do?">
+        <p v-if="isClaimableGift" class="pass-explainer">Choose Keep to claim this gift into your account, or pass it so this exact NIM moves straight into the next private link. Pay It Sideways never takes custody.</p>
         <button class="button button--primary button--wide" type="button" :disabled="keeping" @click="keep">
           {{ claimingFor === 'keep' ? 'Claiming your kindness…' : keepLabel }}
         </button>
         <button class="button button--secondary button--wide" type="button" :disabled="Boolean(claimingFor)" @click="passSideways">
-          <template v-if="claimingFor === 'pass'">Preparing a fresh act…</template>
-          <template v-else>{{ freshLabel }} <span aria-hidden="true">↗</span></template>
+          <template v-if="claimingFor === 'pass'">Preparing the next kindness…</template>
+          <template v-else>{{ isClaimableGift ? 'Pass this gift forward' : 'Pass it sideways—words or optional NIM' }} <span aria-hidden="true">↗</span></template>
         </button>
-        <p class="fresh-act-note">{{ t('freshNote') }}</p>
+        <p v-if="!needsGiftClaim" class="fresh-act-note">{{ t('freshNote') }}</p>
       </section>
 
       <section v-else-if="!selectingAccount" class="receive-actions">
@@ -359,15 +366,15 @@ async function report(): Promise<void> {
 
       <section v-if="!reported" class="chain-card" aria-labelledby="chain-title">
         <div class="chain-heading">
-          <div><p class="eyebrow">This kindness has travelled</p><h2 id="chain-title">You are #{{ data.chain.position }} in this chain.</h2></div>
+          <div><p class="eyebrow">This kindness has travelled</p><h2 id="chain-title">This is note #{{ data.chain.position }} in the chain.</h2></div>
           <span class="chain-sprout" aria-hidden="true">🌱</span>
         </div>
-        <KindnessTrail :people-reached="data.chain.peopleReached" :position="data.chain.position" />
+        <KindnessTrail :links-opened="data.chain.linksOpened" :position="data.chain.position" />
         <dl>
-          <div><dt>People reached</dt><dd>{{ data.chain.peopleReached }}</dd></div>
-          <div><dt>Positive messages</dt><dd>{{ data.chain.positiveMessages }}</dd></div>
+          <div><dt>Recipient links opened</dt><dd>{{ data.chain.linksOpened }}</dd></div>
+          <div><dt>Notes created</dt><dd>{{ data.chain.positiveMessages }}</dd></div>
           <div><dt>Words-only passes</dt><dd>{{ data.chain.messageOnlyPasses }}</dd></div>
-          <div v-if="data.chain.nimPassed > 0"><dt>New NIM gifts added across this chain</dt><dd>{{ data.chain.nimPassed }}</dd></div>
+          <div v-if="data.chain.nimPassed > 0"><dt>NIM attached across this chain</dt><dd>{{ data.chain.nimPassed }}</dd></div>
         </dl>
         <p>Only anonymous totals are shown. The words above stay private.</p>
       </section>

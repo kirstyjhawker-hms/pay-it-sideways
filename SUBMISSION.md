@@ -21,11 +21,11 @@ Pay It Sideways begins with a three-beat story: think of one person, send one pr
 
 A sender answers two simple prompts, then sends their own genuine words. They can optionally add a small NIM gift through Nimiq Pay, but “Words are enough” is the default and is treated as a complete experience. The sender never needs the recipient’s wallet address: one private link carries both the note and, when present, a one-use claimable NIM gift.
 
-The recipient sees the message, the calm promise that nothing is expected in return, and two choices: keep this kindness or pass some kindness sideways. Passing starts a fresh message for somebody else in the same inspiration chain; any later NIM is a new, optional transaction belonging to that new act.
+The recipient sees the message, the calm promise that nothing is expected in return, and two choices: keep this kindness or pass it sideways. Keep claims an attached gift into an account they choose. Pass moves that exact gift directly into the next one-use private link alongside a fresh message—without routing it through the recipient’s wallet or Pay It Sideways.
 
-Anonymous chain totals celebrate people reached, positive messages, words-only passes, and NIM sent alongside them. There are no names, public wallet addresses, leaderboards, streaks, guilt prompts, or “biggest giver” mechanics.
+Anonymous chain totals show recipient links actually opened, notes created, words-only acts, and NIM attached across notes. A separate private trail lets the sender watch the ripple without seeing messages, identities, recipient choices, or wallet addresses. There are no leaderboards, streaks, guilt prompts, or “biggest giver” mechanics.
 
-Nimiq is integral to the addressless gift experience. Nimiq Pay confirms the funding transaction, while the complete private link lets the recipient claim to their chosen Nimiq account. Pay It Sideways never custodies funds or stores the gift key on its server.
+Nimiq is integral to the addressless gift experience. Nimiq Pay confirms the funding transaction, while the complete private link lets the recipient claim to their chosen Nimiq account or relay the same gift link-to-link. Pay It Sideways never custodies funds or stores the gift key on its server.
 
 ## Builder story
 
@@ -38,9 +38,9 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 3. Choose **Add a little NIM**, select 0.5 NIM, and show the native confirmation.
 4. Share the resulting private link to a second device/account.
 5. Open it and show the message, attached NIM, and “nothing you need to do.”
-6. Tap **Keep this kindness**, choose the destination account, and confirm the balance.
-7. Return to a fresh link and tap **Pass it sideways**.
-8. Send words only and show that the chain increments without a payment.
+6. Tap **Pass this gift forward**, write a new note, and show “Carry 0.5 NIM forward—the same gift, not a new payment.”
+7. Send the next private link and open it on a third device to show the gift genuinely travelled with the chain.
+8. Open the sender’s private trail, then use **Keep** to claim into a chosen Nimiq account.
 
 ## Required media
 
@@ -58,8 +58,8 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Claimable link requires no recipient address
 - [x] Funding and claim records are verified against the blockchain
 - [x] Mobile widths, tap targets, focus states, and reduced motion checked
-- [x] 29 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
-- [x] Real Testnet Send → Claim → Pass rerun in the current Nimiq Pay build
+- [x] 31 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
+- [ ] Real Testnet Send → link-to-link Pass → Claim rerun in the current Nimiq Pay build
 - [x] Cloudflare authentication, D1 creation/migration, and production deployment
 - [x] Public GitHub repository published and URL inserted above
 - [x] Production link tested inside Nimiq Pay, including native share/copy

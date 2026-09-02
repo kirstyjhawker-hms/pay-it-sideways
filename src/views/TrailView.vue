@@ -40,16 +40,17 @@ function dateLabel(value: string): string {
       <p class="eyebrow">Your kindness trail</p>
       <h1 id="trail-title">Look where one moment went.</h1>
       <p class="lead">You can see the ripple without seeing anyone’s private words, wallet, or choices.</p>
-      <KindnessTrail :people-reached="data.chain.peopleReached" />
+      <KindnessTrail :links-opened="data.chain.linksOpened" />
       <dl class="trail-stats">
-        <div><dt>People reached</dt><dd>{{ data.chain.peopleReached }}</dd></div>
-        <div><dt>Fresh messages shared</dt><dd>{{ data.chain.positiveMessages }}</dd></div>
+        <div><dt>Recipient links opened</dt><dd>{{ data.chain.linksOpened }}</dd></div>
+        <div><dt>Notes created</dt><dd>{{ data.chain.positiveMessages }}</dd></div>
         <div><dt>Words-only acts</dt><dd>{{ data.chain.messageOnlyPasses }}</dd></div>
-        <div><dt>New NIM gifts added</dt><dd>{{ data.chain.nimGiftCount }}</dd></div>
-        <div v-if="data.chain.nimPassed > 0"><dt>Total new NIM gifted</dt><dd>{{ data.chain.nimPassed }} NIM</dd></div>
+        <div><dt>Notes carrying NIM</dt><dd>{{ data.chain.nimGiftCount }}</dd></div>
+        <div v-if="data.chain.nimPassed > 0"><dt>NIM attached across notes</dt><dd>{{ data.chain.nimPassed }} NIM</dd></div>
       </dl>
       <p class="trail-dates">Started {{ dateLabel(data.chain.startedAt) }}<template v-if="data.chain.lastContinuedAt !== data.chain.startedAt"> · last continued {{ dateLabel(data.chain.lastContinuedAt) }}</template></p>
       <p class="privacy-note">This trail token unlocks anonymous totals only. It cannot open messages, claim gifts, identify recipients, or reveal Nimiq accounts.</p>
+      <p class="privacy-note">A relayed gift is counted once for each note it accompanies; the NIM total does not imply new money was added at every step.</p>
     </section>
   </main>
 </template>

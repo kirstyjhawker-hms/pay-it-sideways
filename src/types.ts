@@ -1,5 +1,5 @@
 export interface ChainStats {
-  peopleReached: number
+  linksOpened: number
   positiveMessages: number
   messageOnlyPasses: number
   nimPassed: number

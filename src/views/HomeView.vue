@@ -5,13 +5,14 @@ import { track } from '../lib/analytics'
 import { listSentLinks } from '../lib/sentLinks'
 import { t } from '../lib/i18n'
 
-type ConnectionState = 'checking' | 'ready' | 'offline'
-const connectionState = ref<ConnectionState>('checking')
+type ConnectionState = 'ready' | 'offline'
+// Social links commonly open in a normal browser. Lead with the useful,
+// truthful fallback while the SDK checks for an injected Nimiq provider.
+const connectionState = ref<ConnectionState>('offline')
 const consensusEstablished = ref(false)
 const hasSentLinks = ref(false)
 
 const walletLabel = computed(() => {
-  if (connectionState.value === 'checking') return 'Checking Nimiq Pay…'
   if (connectionState.value === 'ready' && consensusEstablished.value) return 'Ready inside Nimiq Pay'
   if (connectionState.value === 'ready') return 'Nimiq Pay is syncing'
   return 'Words work anywhere'

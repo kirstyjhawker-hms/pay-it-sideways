@@ -169,12 +169,20 @@ async function acceptKindness(): Promise<void> {
     <section v-else class="flow-card campaign-welcome" aria-labelledby="campaign-title">
       <p class="eyebrow">One of the first kindness chains</p>
       <h1 id="campaign-title">Accept some kindness.</h1>
-      <p class="lead">As a thank-you for helping begin Pay It Sideways, twenty private kindness pots have been prepared. If one reaches you, keep it—or pass the same gift onwards with a message of your own.</p>
+      <p class="lead">As a thank-you for helping begin Pay It Sideways, up to twenty private kindness pots are being prepared. If one reaches you, keep it—or pass the same gift onwards with a message of your own.</p>
       <div v-if="status" class="campaign-meter"><strong>{{ status.remaining }}</strong><span>funded pots waiting</span></div>
       <p class="pass-explainer"><strong>No purchase. No deposit. No referral.</strong> One gift per Nimiq Pay device while funded pots remain. NIM is a cryptoasset and its value can change.</p>
       <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
       <button class="button button--primary button--wide" type="button" :disabled="busy || !campaignToken || !status?.enabled || status.remaining === 0" @click="acceptKindness">
-        {{ busy ? 'Reserving your kindness…' : status?.remaining === 0 ? 'All twenty journeys have begun' : 'Accept the kindness' }}
+        {{ busy
+          ? 'Reserving your kindness…'
+          : status?.funded === 0
+            ? 'Founder pots are being prepared'
+            : status?.remaining === 0 && status.funded < status.capacity
+              ? 'More pots may be added soon'
+              : status?.remaining === 0
+                ? 'All twenty journeys have begun'
+                : 'Accept the kindness' }}
       </button>
       <RouterLink class="text-link" to="/create">Send words instead—always free</RouterLink>
     </section>

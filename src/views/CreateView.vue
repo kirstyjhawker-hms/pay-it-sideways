@@ -54,6 +54,7 @@ const messageReady = computed(() => message.value.trim().length >= 8)
 const lunaValue = computed(() => parseNimToLuna(nimAmount.value))
 const paymentReady = computed(() => paymentChoice.value === 'words' || lunaValue.value !== null)
 const submitting = computed(() => submissionState.value !== 'idle')
+const stepLabel = computed(() => ['Write', 'Optional gift', 'Send'][step.value - 1])
 
 const starters = [
   'I don’t think I tell you enough…',
@@ -105,7 +106,7 @@ onMounted(() => {
     trailToken.value = pending.trailToken && /^[A-Za-z0-9_-]{43}$/.test(pending.trailToken)
       ? pending.trailToken
       : generateRecipientToken()
-    step.value = 4
+    step.value = 3
     errorMessage.value = pending.transactionHash
       ? 'Your funded private gift was recovered on this device. Tap below to finish making its link—no second payment will be made.'
       : 'Your unfinished private gift was recovered on this device.'
@@ -114,22 +115,15 @@ onMounted(() => {
   }
 })
 
-async function goToMessage(): Promise<void> {
-  if (!reasonReady.value) return
-  step.value = 2
-  await nextTick()
-  messageInput.value?.focus()
-}
-
 function goToPayment(): void {
-  if (messageReady.value) {
+  if (reasonReady.value && messageReady.value) {
     track('message_completed')
-    step.value = 3
+    step.value = 2
   }
 }
 
 function goToReview(): void {
-  if (paymentReady.value) step.value = 4
+  if (paymentReady.value) step.value = 3
 }
 
 function useStarter(starter: string): void {
@@ -261,33 +255,28 @@ async function submit(): Promise<void> {
         <span aria-hidden="true">←</span> Back
       </button>
       <RouterLink v-else class="back-button" to="/"><span aria-hidden="true">←</span> Home</RouterLink>
-      <span class="step-count">{{ step }} of 4</span>
+      <span class="step-count">{{ stepLabel }} · {{ step }} of 3</span>
     </nav>
 
     <Transition name="step" mode="out-in">
-      <section v-if="step === 1" key="reason" class="flow-card" aria-labelledby="reason-title">
+      <section v-if="step === 1" key="message" class="flow-card" aria-labelledby="reason-title">
         <p class="eyebrow">{{ isContinuation ? 'Keep it moving' : 'Start with the person' }}</p>
         <h1 id="reason-title">Why did this person come to mind?</h1>
         <p class="supporting">What have they done, or what do you appreciate about them?</p>
         <label class="field-label" for="reason">Your reason</label>
-        <textarea id="reason" v-model="reason" rows="4" maxlength="160" placeholder="You always check in when things get hectic." @keydown.ctrl.enter="goToMessage"></textarea>
+        <textarea id="reason" v-model="reason" rows="3" maxlength="160" placeholder="You always check in when things get hectic."></textarea>
         <div class="field-meta"><span>Just enough to make it personal.</span><span>{{ reason.length }}/160</span></div>
-        <button class="button button--primary button--wide" type="button" :disabled="!reasonReady" @click="goToMessage">Next <span aria-hidden="true">→</span></button>
-      </section>
-
-      <section v-else-if="step === 2" key="message" class="flow-card" aria-labelledby="message-title">
-        <p class="eyebrow">Now, the words</p>
-        <h1 id="message-title">What would you like them to hear today?</h1>
+        <h2 id="message-title" class="prompt-heading">Now, what would you like them to hear?</h2>
         <div class="starter-row" aria-label="Optional message starters">
           <button v-for="starter in starters" :key="starter" type="button" @click="useStarter(starter)">{{ starter }}</button>
         </div>
         <label class="field-label" for="message">Your message</label>
-        <textarea id="message" ref="messageInput" v-model="message" rows="7" maxlength="600" placeholder="I hope you know how appreciated you are." @keydown.ctrl.enter="goToPayment"></textarea>
+        <textarea id="message" ref="messageInput" v-model="message" rows="5" maxlength="600" placeholder="I hope you know how appreciated you are." @keydown.ctrl.enter="goToPayment"></textarea>
         <div class="field-meta"><span>Write it in your own voice.</span><span>{{ message.length }}/600</span></div>
-        <button class="button button--primary button--wide" type="button" :disabled="!messageReady" @click="goToPayment">Next <span aria-hidden="true">→</span></button>
+        <button class="button button--primary button--wide" type="button" :disabled="!reasonReady || !messageReady" @click="goToPayment">Continue <span aria-hidden="true">→</span></button>
       </section>
 
-      <section v-else-if="step === 3" key="payment" class="flow-card" aria-labelledby="payment-title">
+      <section v-else-if="step === 2" key="payment" class="flow-card" aria-labelledby="payment-title">
         <p class="eyebrow">The words already count</p>
         <h1 id="payment-title">Add a little something?</h1>
         <p class="supporting">{{ isContinuation ? 'Start a fresh act with words only or a new NIM gift. What you received stays yours.' : 'Completely optional. The message is the heart of this.' }}</p>

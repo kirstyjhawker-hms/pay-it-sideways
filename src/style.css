@@ -259,6 +259,7 @@ h1 {
 .step-count { color: var(--muted); font-size: 0.76rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .flow-card { width: min(100%, 570px); margin: 0 auto; }
 .flow-card h1 { max-width: 15ch; font-size: clamp(2.1rem, 9.5vw, 3.8rem); }
+.prompt-heading { max-width: 24ch; margin: 16px 0 4px; font-size: 1.35rem; letter-spacing: -0.03em; line-height: 1.2; }
 
 .field-label {
   display: block;

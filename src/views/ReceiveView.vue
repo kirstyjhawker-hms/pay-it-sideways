@@ -34,6 +34,13 @@ const giftSecret = computed(() => {
 })
 
 const isClaimableGift = computed(() => data.value?.sideways.paymentMode === 'claimable')
+const needsGiftClaim = computed(() => isClaimableGift.value && !data.value?.sideways.claimed)
+const keepLabel = computed(() => needsGiftClaim.value
+  ? `Claim ${data.value?.sideways.paymentAmount} NIM & keep this`
+  : t('keep'))
+const freshLabel = computed(() => needsGiftClaim.value
+  ? 'Claim yours, then start fresh'
+  : t('fresh'))
 const giftIsReady = computed(() => {
   const amount = data.value?.sideways.paymentAmount
   return typeof giftBalance.value === 'number'
@@ -335,11 +342,11 @@ async function report(): Promise<void> {
 
       <section v-if="!kept && !selectingAccount" class="receive-actions" aria-label="What would you like to do?">
         <button class="button button--primary button--wide" type="button" :disabled="keeping" @click="keep">
-          {{ claimingFor === 'keep' ? 'Claiming your kindness…' : t('keep') }}
+          {{ claimingFor === 'keep' ? 'Claiming your kindness…' : keepLabel }}
         </button>
         <button class="button button--secondary button--wide" type="button" :disabled="Boolean(claimingFor)" @click="passSideways">
           <template v-if="claimingFor === 'pass'">Preparing a fresh act…</template>
-          <template v-else>{{ t('fresh') }} <span aria-hidden="true">↗</span></template>
+          <template v-else>{{ freshLabel }} <span aria-hidden="true">↗</span></template>
         </button>
         <p class="fresh-act-note">{{ t('freshNote') }}</p>
       </section>

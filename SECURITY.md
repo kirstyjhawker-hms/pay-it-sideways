@@ -4,6 +4,7 @@
 
 - Message text is private application data stored in D1.
 - A 256-bit recipient token authorizes reading and acting on one message. D1 stores only its SHA-256 hash.
+- A separate 256-bit sender trail token authorizes aggregate chain totals only. D1 stores only its SHA-256 hash; it cannot retrieve message text, recipient links, claim data, or wallet addresses.
 - A separate 256-bit Nimiq private key controls an optional one-use gift. It is carried in the URL fragment and retained locally by the sender for recovery; it is never sent to or stored by the API.
 - Funding and claim transactions are public blockchain data.
 - A signed pending claim contains its chosen destination address. D1 retains that public transaction temporarily for idempotent rebroadcast, then deletes the raw copy after verified confirmation or replaces it only after definite expiry and on-chain absence.
@@ -14,12 +15,13 @@
 - The server broadcasts a locally signed claim but records it as claimed only after an included transaction is fetched and its hash, sender, value, and execution result match the stored gift.
 - A client-generated recipient token makes creation idempotent. If a save response is interrupted after D1 commits, retrying returns the same link.
 - A funded draft is persisted locally before wallet confirmation and restored after reload. Once funded, the UI will not silently switch it to words-only.
-- The recent-links index contains only the recipient token, creation time, and gift flag—not message text. If both local and session storage reject a gift key, navigation stops with a retryable error rather than exposing an incomplete funded link.
+- The recent-links index contains only local recovery metadata, including the separate trail token and public funding receipt when present—not message text or wallet addresses. If both local and session storage reject a gift key, navigation stops with a retryable error rather than exposing an incomplete funded link.
 - Reporting erases the words but leaves an unclaimed gift reachable, preventing report abuse from stranding funds.
 
 ## Red-team cases covered
 
 - Guessed recipient tokens: 256 bits of entropy and hash-only storage
+- Guessed sender trail tokens: independent 256-bit entropy, hash-only storage, and an aggregate-only response contract
 - Gift secret leaking to the API/referrer: URL fragment plus `no-referrer`
 - XSS from message content: Vue text interpolation; no raw HTML rendering
 - SQL injection: bound D1 statements only

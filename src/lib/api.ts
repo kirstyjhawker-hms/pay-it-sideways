@@ -1,4 +1,4 @@
-import type { CreatedSideways, SidewaysResponse } from '../types'
+import type { CreatedSideways, SidewaysResponse, TrailResponse } from '../types'
 import type { NimiqNetwork } from './gift'
 
 interface ErrorBody {
@@ -13,6 +13,7 @@ async function readJson<T>(response: Response): Promise<T> {
 
 export async function createSideways(input: {
   recipientToken: string
+  trailToken: string
   reason: string
   message: string
   parentToken?: string
@@ -77,6 +78,10 @@ export async function confirmGiftClaim(input: {
 
 export async function getSideways(token: string): Promise<SidewaysResponse> {
   return readJson<SidewaysResponse>(await fetch(`/api/sideways/${encodeURIComponent(token)}`))
+}
+
+export async function getTrail(token: string): Promise<TrailResponse> {
+  return readJson<TrailResponse>(await fetch(`/api/trails/${encodeURIComponent(token)}`))
 }
 
 export async function keepSideways(token: string): Promise<void> {

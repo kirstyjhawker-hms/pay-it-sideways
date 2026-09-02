@@ -2,17 +2,17 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { track } from '../lib/analytics'
-import { listSentLinks, readGiftSecret, recipientUrl } from '../lib/sentLinks'
+import { listSentLinks, readGiftSecret, recipientUrl, type SentLink } from '../lib/sentLinks'
 
 const route = useRoute()
 const token = computed(() => String(route.params.token))
 const giftSecret = computed(() => readGiftSecret(token.value))
-const sentSummary = computed(() => {
+const sentSummary = computed<Partial<SentLink>>(() => {
   const indexed = listSentLinks().find((link) => link.token === token.value)
-  if (indexed) return { includesGift: indexed.includesGift }
+  if (indexed) return indexed
   try {
     const raw = localStorage.getItem(`sideways:${token.value}`) || sessionStorage.getItem(`sideways:${token.value}`)
-    return JSON.parse(raw || '{}') as { includesGift?: boolean }
+    return JSON.parse(raw || '{}') as Partial<SentLink>
   } catch { return {} }
 })
 const missingGiftKey = computed(() => sentSummary.value.includesGift === true && !giftSecret.value)
@@ -71,6 +71,7 @@ async function copyLink(): Promise<void> {
       <p class="lead">Share this private link with the person you wrote it for. If NIM is attached, this same link is how they claim it.</p>
       <p v-if="giftSecret" class="privacy-note">The complete claim link is recoverable on this device so you can share it again. Anyone with that complete link can claim the attached NIM—send it only to the intended person.</p>
       <p v-if="missingGiftKey" class="error-message" role="alert">The private gift key is missing on this device. Do not share this incomplete link.</p>
+      <p v-if="sentSummary.includesGift && sentSummary.transactionHash" class="verified-badge"><span aria-hidden="true">✓</span> Funding verified on Nimiq</p>
       <button class="button button--primary button--wide" type="button" :disabled="missingGiftKey" @click="share">
         Share with them <span aria-hidden="true">↗</span>
       </button>
@@ -80,6 +81,7 @@ async function copyLink(): Promise<void> {
         <label for="share-link">Copy this private link</label>
         <input id="share-link" :value="shareUrl" readonly @focus="($event.target as HTMLInputElement).select()" />
       </div>
+      <RouterLink v-if="sentSummary.trailToken" class="button button--secondary button--wide" :to="{ name: 'trail', params: { token: sentSummary.trailToken } }">Watch its private trail</RouterLink>
       <RouterLink class="text-link" to="/create">Send another note</RouterLink>
     </section>
   </main>

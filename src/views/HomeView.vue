@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { getNimiqProvider } from '../lib/nimiq'
 import { track } from '../lib/analytics'
 import { listSentLinks } from '../lib/sentLinks'
+import { t } from '../lib/i18n'
 
 type ConnectionState = 'checking' | 'ready' | 'offline'
 const connectionState = ref<ConnectionState>('checking')
@@ -35,31 +36,31 @@ onMounted(async () => {
     </div>
 
     <section class="home-copy" aria-labelledby="home-heading">
-      <p class="eyebrow">One kind moment can start another.</p>
-      <h1 id="home-heading">It starts with someone who showed up.</h1>
+      <p class="eyebrow">{{ t('homeEyebrow') }}</p>
+      <h1 id="home-heading">{{ t('homeTitle') }}</h1>
       <p class="lead">
-        Pay It Sideways turns something you appreciate into a private story they get to continue—or simply keep.
+        {{ t('homeLead') }}
       </p>
 
       <ol class="story-beats" aria-label="How Pay It Sideways works">
         <li>
           <span class="story-number" aria-hidden="true">1</span>
-          <div><strong>Think of one person.</strong><p>Write the thing you appreciate but do not always say.</p></div>
+          <div><strong>{{ t('thinkTitle') }}</strong><p>{{ t('thinkBody') }}</p></div>
         </li>
         <li>
           <span class="story-number" aria-hidden="true">2</span>
-          <div><strong>Send one private link.</strong><p>Words are enough. Add NIM if you want—no wallet address needed.</p></div>
+          <div><strong>{{ t('linkTitle') }}</strong><p>{{ t('linkBody') }}</p></div>
         </li>
         <li>
           <span class="story-number" aria-hidden="true">3</span>
-          <div><strong>They choose what follows.</strong><p>Keep it, claim it, or pass fresh kindness to someone else.</p></div>
+          <div><strong>{{ t('chooseTitle') }}</strong><p>{{ t('chooseBody') }}</p></div>
         </li>
       </ol>
 
       <RouterLink class="button button--primary button--wide" to="/create" @click="track('create_started')">
-        Start with someone <span aria-hidden="true">→</span>
+        {{ t('start') }} <span aria-hidden="true">→</span>
       </RouterLink>
-      <RouterLink v-if="hasSentLinks" class="recent-link" to="/history">Reopen a recent private link</RouterLink>
+      <RouterLink v-if="hasSentLinks" class="recent-link" to="/history">{{ t('recent') }}</RouterLink>
 
       <div class="quiet-status" role="status" aria-live="polite">
         <span class="status-dot" :class="`status-dot--${connectionState}`" aria-hidden="true"></span>

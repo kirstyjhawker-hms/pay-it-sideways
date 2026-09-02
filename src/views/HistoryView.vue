@@ -29,8 +29,11 @@ function recoverable(token: string, includesGift: boolean): boolean {
             <strong>{{ link.includesGift ? 'Private NIM gift' : 'Kindness note' }}</strong>
             <p>{{ createdLabel(link.createdAt) }}</p>
           </div>
-          <RouterLink v-if="recoverable(link.token, link.includesGift)" class="button button--secondary" :to="{ name: 'sent', params: { token: link.token } }">Open &amp; share</RouterLink>
-          <p v-else class="history-warning">Claim key missing—this device cannot rebuild the funded link.</p>
+          <div class="history-actions">
+            <RouterLink v-if="link.trailToken" class="button button--secondary" :to="{ name: 'trail', params: { token: link.trailToken } }">Watch trail</RouterLink>
+            <RouterLink v-if="recoverable(link.token, link.includesGift)" class="button button--secondary" :to="{ name: 'sent', params: { token: link.token } }">Open &amp; share</RouterLink>
+            <p v-else class="history-warning">Claim key missing—this device cannot rebuild the funded link.</p>
+          </div>
         </article>
       </div>
       <div v-else class="history-empty">

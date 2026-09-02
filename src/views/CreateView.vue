@@ -13,6 +13,7 @@ type SubmissionState = 'idle' | 'confirming' | 'saving'
 
 interface PendingGift {
   recipientToken: string
+  trailToken: string
   reason: string
   message: string
   nimAmount: string
@@ -42,6 +43,7 @@ const completedTransaction = ref<string>()
 const giftKey = ref<GiftKey>()
 const giftNetwork = ref<NimiqNetwork>()
 const recipientToken = ref(generateRecipientToken())
+const trailToken = ref(generateRecipientToken())
 const errorMessage = ref('')
 const messageInput = ref<HTMLTextAreaElement>()
 
@@ -65,6 +67,7 @@ function persistPendingGift(): void {
   if (!giftKey.value) return
   const pending: PendingGift = {
     recipientToken: recipientToken.value,
+    trailToken: trailToken.value,
     reason: reason.value,
     message: message.value,
     nimAmount: nimAmount.value,
@@ -99,6 +102,9 @@ onMounted(() => {
     completedTransaction.value = pending.transactionHash
     giftNetwork.value = pending.network
     recipientToken.value = pending.recipientToken
+    trailToken.value = pending.trailToken && /^[A-Za-z0-9_-]{43}$/.test(pending.trailToken)
+      ? pending.trailToken
+      : generateRecipientToken()
     step.value = 4
     errorMessage.value = pending.transactionHash
       ? 'Your funded private gift was recovered on this device. Tap below to finish making its link—no second payment will be made.'
@@ -205,6 +211,7 @@ async function submit(): Promise<void> {
       : undefined
     const created = await createSideways({
       recipientToken: recipientToken.value,
+      trailToken: trailToken.value,
       reason: reason.value,
       message: message.value,
       parentToken: parentToken.value,
@@ -224,8 +231,12 @@ async function submit(): Promise<void> {
     }
     saveSentLink({
       token: created.token,
+      trailToken: trailToken.value,
       createdAt: new Date().toISOString(),
       includesGift: paymentChoice.value === 'nim',
+      paymentAmount: amount,
+      paymentNetwork: giftNetwork.value,
+      transactionHash: completedTransaction.value,
     })
     clearPendingGift()
     await router.replace({ name: 'sent', params: { token: created.token } })
@@ -279,7 +290,7 @@ async function submit(): Promise<void> {
       <section v-else-if="step === 3" key="payment" class="flow-card" aria-labelledby="payment-title">
         <p class="eyebrow">The words already count</p>
         <h1 id="payment-title">Add a little something?</h1>
-        <p class="supporting">{{ isContinuation ? 'Send the same amount, more, less, or just your words. Completely optional.' : 'Completely optional. The message is the heart of this.' }}</p>
+        <p class="supporting">{{ isContinuation ? 'Start a fresh act with words only or a new NIM gift. What you received stays yours.' : 'Completely optional. The message is the heart of this.' }}</p>
 
         <div class="payment-choices">
           <button type="button" :class="{ selected: paymentChoice === 'words' }" :aria-pressed="paymentChoice === 'words'" @click="choosePayment('words')">
@@ -317,7 +328,7 @@ async function submit(): Promise<void> {
           <span class="choice-check" aria-hidden="true">✓</span>
         </div>
 
-        <p class="privacy-note">The message stays private to anyone with its unguessable link. We count this act anonymously in its chain—never the words you wrote.</p>
+        <p class="privacy-note">The message stays private to anyone with its unguessable link. Anonymous totals let you watch its trail later—never the words, wallets, or recipient choices.</p>
         <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
         <button class="button button--primary button--wide" type="button" :disabled="submitting" @click="submit">
           <span v-if="submissionState === 'confirming'">Confirm in Nimiq Pay…</span>

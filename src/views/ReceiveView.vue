@@ -3,9 +3,11 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { broadcastGiftClaim, confirmGiftClaim, getGiftState, getSideways, keepSideways, reportSideways } from '../lib/api'
 import type { SidewaysResponse } from '../types'
+import KindnessTrail from '../components/KindnessTrail.vue'
 import { track } from '../lib/analytics'
 import { createClaimTransaction, giftSecretFromHash } from '../lib/gift'
 import { getNimiqProvider } from '../lib/nimiq'
+import { t } from '../lib/i18n'
 
 const route = useRoute()
 const router = useRouter()
@@ -308,6 +310,7 @@ async function report(): Promise<void> {
             </template>
           </div>
         </div>
+        <p v-if="data.sideways.includesPayment && (giftIsReady || data.sideways.claimed)" class="verified-badge"><span aria-hidden="true">✓</span> {{ t(data.sideways.claimed ? 'verifiedClaim' : 'verifiedGift') }}</p>
         <p class="no-obligation">There is nothing you need to do in return.</p>
       </section>
 
@@ -332,12 +335,13 @@ async function report(): Promise<void> {
 
       <section v-if="!kept && !selectingAccount" class="receive-actions" aria-label="What would you like to do?">
         <button class="button button--primary button--wide" type="button" :disabled="keeping" @click="keep">
-          {{ claimingFor === 'keep' ? 'Claiming your kindness…' : 'Keep this kindness' }}
+          {{ claimingFor === 'keep' ? 'Claiming your kindness…' : t('keep') }}
         </button>
         <button class="button button--secondary button--wide" type="button" :disabled="Boolean(claimingFor)" @click="passSideways">
-          <template v-if="claimingFor === 'pass'">Preparing the next kindness…</template>
-          <template v-else>Pass it sideways—same, more, less, or words only <span aria-hidden="true">↗</span></template>
+          <template v-if="claimingFor === 'pass'">Preparing a fresh act…</template>
+          <template v-else>{{ t('fresh') }} <span aria-hidden="true">↗</span></template>
         </button>
+        <p class="fresh-act-note">{{ t('freshNote') }}</p>
       </section>
 
       <section v-else-if="!selectingAccount" class="receive-actions">
@@ -351,11 +355,12 @@ async function report(): Promise<void> {
           <div><p class="eyebrow">This kindness has travelled</p><h2 id="chain-title">You are #{{ data.chain.position }} in this chain.</h2></div>
           <span class="chain-sprout" aria-hidden="true">🌱</span>
         </div>
+        <KindnessTrail :people-reached="data.chain.peopleReached" :position="data.chain.position" />
         <dl>
           <div><dt>People reached</dt><dd>{{ data.chain.peopleReached }}</dd></div>
           <div><dt>Positive messages</dt><dd>{{ data.chain.positiveMessages }}</dd></div>
           <div><dt>Words-only passes</dt><dd>{{ data.chain.messageOnlyPasses }}</dd></div>
-          <div v-if="data.chain.nimPassed > 0"><dt>NIM passed alongside messages</dt><dd>{{ data.chain.nimPassed }}</dd></div>
+          <div v-if="data.chain.nimPassed > 0"><dt>New NIM gifts added across this chain</dt><dd>{{ data.chain.nimPassed }}</dd></div>
         </dl>
         <p>Only anonymous totals are shown. The words above stay private.</p>
       </section>

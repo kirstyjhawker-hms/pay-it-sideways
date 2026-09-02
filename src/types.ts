@@ -31,3 +31,11 @@ export interface CreatedSideways {
   path: string
   chainId: string
 }
+
+export interface TrailResponse {
+  chain: Omit<ChainStats, 'position'> & {
+    nimGiftCount: number
+    startedAt: string
+    lastContinuedAt: string
+  }
+}

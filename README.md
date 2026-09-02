@@ -17,8 +17,8 @@ This is an app-specific bearer gift, similar in principle to a Nimiq Cashlink. A
 1. Write why someone came to mind and what you want them to hear.
 2. Send words only, or fund a private NIM gift through Nimiq Pay.
 3. Share one private recipient link—no recipient address is required.
-4. The recipient keeps the message/gift or starts the next act in the chain.
-5. The chain shows anonymous totals, never names, rankings, or wallet addresses.
+4. The recipient keeps the message/gift or starts a separate new act in the chain; received NIM is never forwarded.
+5. A private sender trail shows anonymous totals, never messages, names, recipient choices, or wallet addresses.
 
 ## Stack and architecture
 
@@ -28,7 +28,7 @@ This is an app-specific bearer gift, similar in principle to a Nimiq Cashlink. A
 - Cloudflare Worker API and D1
 - Same-origin frontend/API with a strict CSP and no third-party scripts
 
-Recipient tokens and gift keys have separate security properties. Only the SHA-256 hash of the 256-bit recipient token is stored in D1. The one-use gift key is in the URL fragment, which is not sent in HTTP requests, plus a local recovery copy on the sender's device. Before relaying a claim, the backend decodes the signed transaction through Nimiq RPC and constrains it to the stored gift address, exact Luna value, basic account types, zero fee/data/flags, and recorded network. It then verifies the included claim independently before recording it.
+Recipient tokens, sender trail tokens, and gift keys have separate security properties. Only SHA-256 hashes of the two independent 256-bit access tokens are stored in D1. A trail token can read aggregate chain totals only. The one-use gift key is in the URL fragment, which is not sent in HTTP requests, plus a local recovery copy on the sender's device. Before relaying a claim, the backend decodes the signed transaction through Nimiq RPC and constrains it to the stored gift address, exact Luna value, basic account types, zero fee/data/flags, and recorded network. It then verifies the included claim independently before recording it.
 
 ## Local development
 
@@ -58,7 +58,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-The 29 automated tests cover exact Luna parsing/storage, gift-key validation, Nimiq network mapping, device-local link recovery, storage-failure protection, opt-in analytics consent, CSP drift protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, fabricated-payment and raw-relay rejection, interrupted claim recovery, rebroadcast, and post-chain confirmation. The message-only UI, recent-link recovery, analytics preference, and Nimiq WebAssembly under production CSP are also verified through mobile-sized browser runs. Release acceptance included a real Testnet Send → Claim → Pass run and native share/copy inside Nimiq Pay.
+The 30 automated tests cover exact Luna parsing/storage, gift-key validation, Nimiq network mapping, device-local link and trail recovery, trail-data separation, storage-failure protection, opt-in analytics consent, CSP drift protection, strict funding/claim transaction matching, and the complete Worker/D1 lifecycle in Cloudflare's local Workers runtime. That integration suite includes idempotent saves, private retrieval, keep/pass linkage, reporting, bounded analytics, fabricated-payment and raw-relay rejection, interrupted claim recovery, rebroadcast, and post-chain confirmation. The message-only UI, recent-link recovery, analytics preference, and Nimiq WebAssembly under production CSP are also verified through mobile-sized browser runs. Release acceptance included a real Testnet Send → Claim → Pass run and native share/copy inside Nimiq Pay.
 
 ## Deployment
 
@@ -72,6 +72,7 @@ The 29 automated tests cover exact Luna parsing/storage, gift-key validation, Ni
 
 - No accounts, real names, public feed, public wallet addresses, or advertising trackers
 - Messages are accessible only to anyone holding their unguessable recipient link
+- Sender trails use a different unguessable token and expose aggregate counts only
 - NIM transactions remain public on the Nimiq blockchain
 - A settling claim temporarily stores its already-signed transaction—including the chosen destination address—for safe retry, then removes the raw copy after verified confirmation
 - Reporting permanently removes message text without blocking an attached gift claim

@@ -7,6 +7,7 @@ interface Env {
 
 interface CreateSidewaysBody {
   recipientToken?: unknown
+  trailToken?: unknown
   reason?: unknown
   message?: unknown
   parentToken?: unknown
@@ -185,6 +186,36 @@ function tokenFromPath(pathname: string, suffix = ''): string | null {
   return match[1]
 }
 
+function trailTokenFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/api\/trails\/([^/]+)$/)
+  if (!match?.[1] || match[1].length > 128) return null
+  return match[1]
+}
+
+interface ChainStatsRow {
+  people_reached: number
+  message_only_passes: number
+  nim_gift_count: number
+  nim_passed_luna: number
+  started_at: string
+  last_continued_at: string
+}
+
+async function getChainStats(chainId: string, env: Env): Promise<ChainStatsRow | null> {
+  return env.DB.prepare(`
+    SELECT
+      COUNT(*) AS people_reached,
+      SUM(CASE WHEN includes_payment = 0 THEN 1 ELSE 0 END) AS message_only_passes,
+      SUM(CASE WHEN includes_payment = 1 THEN 1 ELSE 0 END) AS nim_gift_count,
+      COALESCE(SUM(CASE WHEN includes_payment = 1 THEN payment_luna ELSE 0 END), 0) AS nim_passed_luna,
+      MIN(s.created_at) AS started_at,
+      MAX(s.created_at) AS last_continued_at
+    FROM sideways s
+    INNER JOIN consents c ON c.sideways_id = s.id
+    WHERE s.chain_id = ? AND s.status = 'delivered' AND c.allow_aggregate_tracking = 1
+  `).bind(chainId).first<ChainStatsRow>()
+}
+
 async function createSideways(request: Request, env: Env): Promise<Response> {
   let body: CreateSidewaysBody
   try {
@@ -205,12 +236,21 @@ async function createSideways(request: Request, env: Env): Promise<Response> {
   if (typeof body.recipientToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.recipientToken)) {
     return json({ error: 'The private link identifier is missing or invalid.' }, 422)
   }
+  if (typeof body.trailToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.trailToken)) {
+    return json({ error: 'The private trail identifier is missing or invalid.' }, 422)
+  }
   const token = body.recipientToken
   const hash = await tokenHash(token)
+  const trailHash = await tokenHash(body.trailToken)
   const existing = await env.DB.prepare(
     'SELECT chain_id FROM sideways WHERE recipient_token_hash = ?'
   ).bind(hash).first<{ chain_id: string }>()
-  if (existing) return json({ token, path: `/s/${token}`, chainId: existing.chain_id })
+  if (existing) {
+    await env.DB.prepare(
+      'INSERT OR IGNORE INTO trail_access (token_hash, chain_id, created_at) VALUES (?, ?, ?)'
+    ).bind(trailHash, existing.chain_id, new Date().toISOString()).run()
+    return json({ token, path: `/s/${token}`, chainId: existing.chain_id })
+  }
 
   const includesPayment = body.includesPayment === true
   let paymentAmount: number | null = null
@@ -304,6 +344,9 @@ async function createSideways(request: Request, env: Env): Promise<Response> {
   statements.push(env.DB.prepare(
     'INSERT INTO consents (sideways_id, allow_aggregate_tracking, allow_anonymous_quote) VALUES (?, 1, 0)'
   ).bind(id))
+  statements.push(env.DB.prepare(
+    'INSERT INTO trail_access (token_hash, chain_id, created_at) VALUES (?, ?, ?)'
+  ).bind(trailHash, chainId, now))
 
   try {
     await env.DB.batch(statements)
@@ -331,19 +374,7 @@ async function getSideways(token: string, env: Env): Promise<Response> {
     return json({ error: 'This message is no longer available.' }, 410)
   }
 
-  const stats = await env.DB.prepare(`
-    SELECT
-      COUNT(*) AS people_reached,
-      SUM(CASE WHEN includes_payment = 0 THEN 1 ELSE 0 END) AS message_only_passes,
-      COALESCE(SUM(CASE WHEN includes_payment = 1 THEN payment_luna ELSE 0 END), 0) AS nim_passed_luna
-    FROM sideways s
-    INNER JOIN consents c ON c.sideways_id = s.id
-    WHERE s.chain_id = ? AND s.status = 'delivered' AND c.allow_aggregate_tracking = 1
-  `).bind(sideways.chain_id).first<{
-    people_reached: number
-    message_only_passes: number
-    nim_passed_luna: number
-  }>()
+  const stats = await getChainStats(sideways.chain_id, env)
 
   const position = await env.DB.prepare(`
     SELECT COUNT(*) AS position FROM sideways
@@ -373,6 +404,29 @@ async function getSideways(token: string, env: Env): Promise<Response> {
       messageOnlyPasses: Number(stats?.message_only_passes ?? 1),
       nimPassed: Number(stats?.nim_passed_luna ?? 0) / 100_000,
       position: Number(position?.position ?? 1),
+    },
+  })
+}
+
+async function getTrail(token: string, env: Env): Promise<Response> {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return json({ error: 'This private trail could not be found.' }, 404)
+  const hash = await tokenHash(token)
+  const access = await env.DB.prepare(
+    'SELECT chain_id FROM trail_access WHERE token_hash = ?'
+  ).bind(hash).first<{ chain_id: string }>()
+  if (!access) return json({ error: 'This private trail could not be found.' }, 404)
+
+  const stats = await getChainStats(access.chain_id, env)
+  if (!stats?.people_reached) return json({ error: 'This private trail could not be found.' }, 404)
+  return json({
+    chain: {
+      peopleReached: Number(stats.people_reached),
+      positiveMessages: Number(stats.people_reached),
+      messageOnlyPasses: Number(stats.message_only_passes),
+      nimGiftCount: Number(stats.nim_gift_count),
+      nimPassed: Number(stats.nim_passed_luna) / 100_000,
+      startedAt: stats.started_at,
+      lastContinuedAt: stats.last_continued_at,
     },
   })
 }
@@ -683,6 +737,9 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === 'POST' && url.pathname === '/api/nimiq/detect-network') {
     return detectNimiqNetwork(request)
   }
+
+  const trailToken = trailTokenFromPath(url.pathname)
+  if (request.method === 'GET' && trailToken) return getTrail(trailToken, env)
 
   const keepToken = tokenFromPath(url.pathname, 'keep')
   if (request.method === 'POST' && keepToken) return keepSideways(keepToken, env)

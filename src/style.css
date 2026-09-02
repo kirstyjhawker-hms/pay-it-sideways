@@ -389,6 +389,7 @@ textarea:focus, input:focus { border-color: rgba(53, 97, 84, 0.6); background: v
 .history-card p { margin: 4px 0 0; color: var(--muted); font-size: 0.76rem; }
 .history-card .button { min-height: 48px; }
 .history-card .history-warning { color: var(--danger); line-height: 1.45; }
+.history-actions { display: grid; gap: 8px; }
 .history-empty { display: grid; gap: 18px; margin: 30px 0; color: var(--muted); }
 
 @media (min-width: 560px) {
@@ -411,6 +412,7 @@ textarea:focus, input:focus { border-color: rgba(53, 97, 84, 0.6); background: v
 .payment-received p { margin: 3px 0 0; color: var(--muted); font-size: 0.76rem; }
 .no-obligation { margin: 30px 0; padding: 15px 17px; border-radius: 14px; color: var(--leaf-dark); background: rgba(53, 97, 84, 0.08); font-weight: 600; text-align: center; }
 .receive-actions { display: grid; width: min(100%, 600px); gap: 10px; margin: 0 auto 34px; }
+.fresh-act-note { margin: 1px 8px 0; color: var(--muted); font-size: 0.74rem; line-height: 1.5; text-align: center; }
 .account-picker { margin-bottom: 28px; padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255, 253, 248, 0.72); }
 .account-picker h2 { margin-bottom: 8px; font-size: 1.35rem; }
 .account-picker .button + .button { margin-top: 8px; }
@@ -440,6 +442,22 @@ textarea:focus, input:focus { border-color: rgba(53, 97, 84, 0.6); background: v
 .chain-card dt { color: var(--muted); font-size: 0.8rem; }
 .chain-card dd { margin: 0; font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; font-weight: 700; }
 .chain-card > p { margin: 0; color: var(--muted); font-size: 0.7rem; line-height: 1.45; }
+
+.kindness-trail { margin: 24px 0 8px; overflow: hidden; }
+.trail-line { position: relative; display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 8px; padding: 0 3px; }
+.trail-line::before { position: absolute; right: 12px; left: 12px; height: 2px; content: ''; background: linear-gradient(90deg, rgba(53,97,84,.2), rgba(245,200,76,.75), rgba(53,97,84,.25)); }
+.trail-node { z-index: 1; display: grid; width: 18px; height: 18px; flex: 0 0 18px; place-items: center; border: 3px solid var(--white); border-radius: 50%; color: var(--leaf-dark); background: var(--leaf); box-shadow: 0 0 0 1px rgba(53,97,84,.24); font-size: .58rem; }
+.trail-node:nth-child(even) { transform: translateY(8px); background: var(--sun); }
+.trail-node--active { width: 30px; height: 30px; flex-basis: 30px; background: var(--sun); box-shadow: 0 0 0 5px rgba(245,200,76,.18); transform: none !important; }
+.trail-more { z-index: 1; display: grid; min-width: 34px; min-height: 30px; place-items: center; padding: 0 6px; border-radius: 999px; color: var(--white); background: var(--leaf); font-size: .68rem; font-weight: 800; }
+.trail-screen { width: min(100%, 650px); }
+.trail-dashboard h1 { max-width: 12ch; font-size: clamp(2.3rem, 9vw, 4rem); }
+.trail-stats { display: grid; gap: 2px; margin: 24px 0 14px; }
+.trail-stats div { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); }
+.trail-stats dt { color: var(--muted); font-size: .82rem; }
+.trail-stats dd { margin: 0; font-weight: 800; }
+.trail-dates { color: var(--muted); font-size: .75rem; }
+.verified-badge { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 7px; margin: 0 0 18px; padding: 6px 12px; border-radius: 999px; color: var(--leaf-dark); background: rgba(53,97,84,.1); font-size: .75rem; font-weight: 700; }
 
 .safety-area { width: min(100%, 600px); margin: 22px auto 0; text-align: center; }
 .subtle-button { color: #827e72; font-size: 0.74rem; text-decoration: underline; }

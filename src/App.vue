@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { track } from './lib/analytics'
+import { t } from './lib/i18n'
 
 onMounted(() => track('app_open'))
 </script>
@@ -21,9 +22,9 @@ onMounted(() => track('app_open'))
     </RouterView>
 
     <footer class="site-footer">
-      <span>Private by default.</span>
+      <span>{{ t('privateDefault') }}</span>
       <span aria-hidden="true">·</span>
-      <RouterLink to="/about">Privacy, terms &amp; about</RouterLink>
+      <RouterLink to="/about">{{ t('about') }}</RouterLink>
     </footer>
   </div>
 </template>

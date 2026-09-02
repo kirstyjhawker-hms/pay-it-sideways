@@ -14,6 +14,7 @@ class FailingStorage {
 
 const tokenA = 'abcdefghijklmnopqrstuvwxyz123456'
 const tokenB = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ654321'
+const trailToken = 'T'.repeat(43)
 
 describe('device-local sent link recovery', () => {
   it('rejects malformed index data', () => {
@@ -27,6 +28,14 @@ describe('device-local sent link recovery', () => {
     saveSentLink({ token: tokenB, createdAt: '2026-09-01T00:00:00.000Z', includesGift: true }, [store])
     saveSentLink({ token: tokenA, createdAt: '2026-09-02T00:00:00.000Z', includesGift: false }, [store])
     expect(listSentLinks([store]).map((link) => link.token)).toEqual([tokenA, tokenB])
+  })
+
+  it('keeps a separate valid trail token while accepting older saved entries', () => {
+    const store = new MemoryStorage()
+    saveSentLink({ token: tokenA, trailToken, createdAt: '2026-09-01T00:00:00.000Z', includesGift: false }, [store])
+    expect(listSentLinks([store])[0]?.trailToken).toBe(trailToken)
+    expect(parseSentLinks(JSON.stringify([{ token: tokenB, createdAt: '2026-09-01T00:00:00.000Z', includesGift: false }]))).toHaveLength(1)
+    expect(parseSentLinks(JSON.stringify([{ token: tokenB, trailToken: 'short', createdAt: '2026-09-01T00:00:00.000Z', includesGift: false }]))).toEqual([])
   })
 
   it('keeps the gift key separate and rebuilds a fragment-only claim link', () => {

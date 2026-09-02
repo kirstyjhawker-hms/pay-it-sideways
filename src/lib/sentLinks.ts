@@ -1,7 +1,11 @@
 export interface SentLink {
   token: string
+  trailToken?: string
   createdAt: string
   includesGift: boolean
+  paymentAmount?: number
+  paymentNetwork?: 'main' | 'test'
+  transactionHash?: string
 }
 
 interface StorageLike {
@@ -27,6 +31,10 @@ function validLink(value: unknown): value is SentLink {
     && typeof link.createdAt === 'string'
     && !Number.isNaN(Date.parse(link.createdAt))
     && typeof link.includesGift === 'boolean'
+    && (link.trailToken === undefined || /^[A-Za-z0-9_-]{43}$/.test(link.trailToken))
+    && (link.paymentAmount === undefined || (Number.isFinite(link.paymentAmount) && link.paymentAmount > 0))
+    && (link.paymentNetwork === undefined || link.paymentNetwork === 'main' || link.paymentNetwork === 'test')
+    && (link.transactionHash === undefined || /^[a-f0-9]{64}$/i.test(link.transactionHash))
 }
 
 export function parseSentLinks(raw: string | null): SentLink[] {

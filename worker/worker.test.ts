@@ -40,8 +40,10 @@ function post(body?: unknown): RequestInit {
 describe('Worker API', () => {
   it('runs the private words-only lifecycle idempotently', async () => {
     const token = 'D'.repeat(43)
+    const trailToken = 'T'.repeat(43)
     const body = {
       recipientToken: token,
+      trailToken,
       reason: 'You made the hard part easier.',
       message: 'Thank you for showing up with patience and good humour.',
     }
@@ -70,6 +72,7 @@ describe('Worker API', () => {
     const childToken = 'E'.repeat(43)
     const child = await dispatch('/api/sideways', post({
       recipientToken: childToken,
+      trailToken: 'U'.repeat(43),
       parentToken: token,
       reason: 'You made somebody feel welcome.',
       message: 'Your quiet kindness was noticed and appreciated.',
@@ -81,6 +84,21 @@ describe('Worker API', () => {
     expect(await childView.json()).toMatchObject({
       chain: { peopleReached: 2, positiveMessages: 2, messageOnlyPasses: 2, position: 2 },
     })
+
+    const trailView = await dispatch(`/api/trails/${trailToken}`)
+    expect(await trailView.json()).toMatchObject({
+      chain: {
+        peopleReached: 2,
+        positiveMessages: 2,
+        messageOnlyPasses: 2,
+        nimGiftCount: 0,
+        nimPassed: 0,
+      },
+    })
+    const trailText = await (await dispatch(`/api/trails/${trailToken}`)).text()
+    expect(trailText).not.toContain(body.message)
+    expect(trailText).not.toContain('transactionHash')
+    expect((await dispatch(`/api/trails/${'Z'.repeat(43)}`)).status).toBe(404)
 
     expect((await dispatch(`/api/sideways/${token}/report`, post())).status).toBe(200)
     expect((await dispatch(`/api/sideways/${token}`)).status).toBe(410)
@@ -94,6 +112,7 @@ describe('Worker API', () => {
 
     const oversized = await dispatch('/api/sideways', post({
       recipientToken: 'F'.repeat(43),
+      trailToken: 'V'.repeat(43),
       reason: 'x'.repeat(17_000),
       message: 'This body must be rejected before parsing fields.',
     }))
@@ -159,8 +178,10 @@ describe('Worker API', () => {
     }))
 
     const token = 'G'.repeat(43)
+    const trailToken = 'W'.repeat(43)
     const created = await dispatch('/api/sideways', post({
       recipientToken: token,
+      trailToken,
       reason: 'You were generous with your time.',
       message: 'Thank you for making a difficult day feel lighter.',
       includesPayment: true,
@@ -179,6 +200,7 @@ describe('Worker API', () => {
     const paidChildToken = 'J'.repeat(43)
     const paidChild = await dispatch('/api/sideways', post({
       recipientToken: paidChildToken,
+      trailToken: 'X'.repeat(43),
       parentToken: token,
       reason: 'Exact totals make the chain trustworthy.',
       message: 'Even small decimal gifts should add up without floating-point noise.',
@@ -194,9 +216,14 @@ describe('Worker API', () => {
     expect(await paidChildView.json()).toMatchObject({
       chain: { peopleReached: 2, nimPassed: 1.2 },
     })
+    const paidTrail = await dispatch(`/api/trails/${trailToken}`)
+    expect(await paidTrail.json()).toMatchObject({
+      chain: { peopleReached: 2, nimGiftCount: 2, nimPassed: 1.2 },
+    })
 
     const legacyDirect = await dispatch('/api/sideways', post({
       recipientToken: 'I'.repeat(43),
+      trailToken: 'Y'.repeat(43),
       reason: 'A fabricated payment must never save.',
       message: 'New direct-payment records are not accepted by this backend.',
       includesPayment: true,
@@ -276,6 +303,7 @@ describe('Worker API', () => {
 
     const mismatch = await dispatch('/api/sideways', post({
       recipientToken: 'H'.repeat(43),
+      trailToken: 'Q'.repeat(43),
       reason: 'This mismatch should never save.',
       message: 'The funding value must match the promised gift exactly.',
       includesPayment: true,

@@ -362,6 +362,8 @@ textarea:focus, input:focus { border-color: rgba(53, 97, 84, 0.6); background: v
 .nim-symbol { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; color: white; background: var(--leaf); font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; font-size: 0.78rem; font-weight: 700; transform: rotate(-4deg); }
 
 .payment-fields { margin: 0 0 24px; padding: 18px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255,255,255,0.32); }
+.access-note { margin: 0 0 16px; padding: 12px 13px; border-radius: 14px; color: var(--ink-soft); background: rgba(255, 211, 77, 0.18); font-size: 0.74rem; line-height: 1.5; }
+.access-note strong { color: var(--ink); }
 .amount-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 20px; }
 .amount-presets button { min-height: 44px; padding: 0 5px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); background: rgba(255,253,248,0.7); cursor: pointer; font-size: 0.75rem; font-weight: 600; }
 .amount-presets button.selected { border-color: var(--leaf); color: var(--leaf-dark); background: rgba(53, 97, 84, 0.08); }

@@ -340,7 +340,7 @@ async function submit(): Promise<void> {
 
         <div v-if="isCarryingGift" class="words-choice">
           <span class="nim-symbol" aria-hidden="true">N</span>
-          <div><strong>Carry {{ nimAmount }} NIM forward</strong><p>The same gift, not a new payment.</p></div>
+          <div><strong>Carry {{ nimAmount }} NIM forward</strong><p>The same gift, not a new payment. You do not need a wallet or any NIM of your own.</p></div>
           <span class="choice-check" aria-hidden="true">✓</span>
         </div>
         <div v-else class="payment-choices">
@@ -353,6 +353,7 @@ async function submit(): Promise<void> {
         </div>
 
         <div v-if="paymentChoice === 'nim' && !isCarryingGift" class="payment-fields">
+          <p class="access-note"><strong>Only choose this if you already have NIM in Nimiq Pay.</strong> You never need to buy NIM to send a meaningful note—choose “Words are enough” above instead.</p>
           <div class="amount-presets" aria-label="Choose a NIM amount">
             <button v-for="amount in ['0.5', '1', '2', '5']" :key="amount" type="button" :class="{ selected: nimAmount === amount }" @click="nimAmount = amount">{{ amount }} NIM</button>
           </div>

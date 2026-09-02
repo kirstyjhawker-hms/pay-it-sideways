@@ -347,7 +347,7 @@ async function report(): Promise<void> {
       </section>
 
       <section v-if="!kept && !selectingAccount" class="receive-actions" aria-label="What would you like to do?">
-        <p v-if="isClaimableGift" class="pass-explainer">Choose Keep to claim this gift into your account, or pass it so this exact NIM moves straight into the next private link. Pay It Sideways never takes custody.</p>
+        <p v-if="isClaimableGift" class="pass-explainer"><strong>No NIM to buy.</strong> Choose Keep to claim this gift into your account, or pass it so this exact NIM moves straight into the next private link. Passing needs no wallet and none of your own NIM. Pay It Sideways never takes custody.</p>
         <button class="button button--primary button--wide" type="button" :disabled="keeping" @click="keep">
           {{ claimingFor === 'keep' ? 'Claiming your kindness…' : keepLabel }}
         </button>

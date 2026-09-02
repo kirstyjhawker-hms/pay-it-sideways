@@ -10,10 +10,11 @@
 | Pricing | Free |
 | Repository | https://github.com/kirstyjhawker-hms/pay-it-sideways |
 | Demo | https://pay-it-sideways.grand-sugar.workers.dev |
-| Video | Add walkthrough URL if recorded |
+| Video | https://youtu.be/qk53Jla9X5g |
 | GitHub login | `kirstyjhawker-hms` |
-| Contact email | Add in the submission portal; do not commit if you prefer it private |
-| Nimiq payout address | Add in the submission portal; never use a gift address |
+| X account | https://x.com/KHDigitalStudio |
+| Contact email | Entered in the submission portal; not duplicated here |
+| Nimiq payout address | Entered privately in the submission portal; never use a gift address |
 
 ## Description (under 250 words)
 
@@ -64,6 +65,7 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Public GitHub repository published and URL inserted above
 - [x] Production link tested inside Nimiq Pay, including native share/copy
 - [x] Icon, thumbnail, and four final screenshots prepared in `submission-assets/`
-- [ ] Optional video recorded and uploaded
-- [ ] Contact email, confirmed GitHub login, and personal payout NIM address entered
-- [ ] Submission portal review completed—but do not press final submit until ready
+- [x] Public walkthrough recorded and uploaded
+- [x] Contact email, confirmed GitHub login, X account, and personal payout NIM address entered
+- [x] Submission portal sent as PR #100
+- [ ] Repair PR #101 merged and PR #100 rerun with every external check passing

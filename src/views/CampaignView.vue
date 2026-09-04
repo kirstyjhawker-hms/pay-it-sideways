@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { addCampaignSlot, allocateCampaignGift, createSideways, detectNimiqNetwork, getCampaignStatus, type CampaignStatus } from '../lib/api'
 import { decryptCampaignGift, encryptCampaignGift } from '../lib/campaign'
 import { generateGiftKey, normalizeNetwork, type GiftKey, type NimiqNetwork } from '../lib/gift'
-import { getNimiqProvider } from '../lib/nimiq'
+import { getNimiqProvider, nimiqPayDeepLink } from '../lib/nimiq'
 import { saveGiftSecret, saveSentLink } from '../lib/sentLinks'
 
 interface PendingSlot {
@@ -25,6 +25,8 @@ const loading = ref(true)
 const busy = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const isInsideNimiqPay = Boolean(window.nimiqPay)
+const openInNimiqPayUrl = nimiqPayDeepLink(window.location.href)
 
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
@@ -162,7 +164,9 @@ async function acceptKindness(): Promise<void> {
       <p class="privacy-note">Maximum campaign funding: 100,000 NIM. Each gift link is encrypted on this device before upload; the server cannot open or spend it. Never share this setup URL.</p>
       <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
       <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
-      <button class="button button--primary button--wide" type="button" :disabled="busy || !campaignToken || !status?.enabled || status.funded >= status.capacity" @click="fundNext">
+      <a v-if="!isInsideNimiqPay && campaignToken" class="button button--primary button--wide" :href="openInNimiqPayUrl">Open in Nimiq Pay to fund <span aria-hidden="true">↗</span></a>
+      <p v-if="!isInsideNimiqPay && campaignToken" class="fresh-act-note">This securely carries the complete private founder link into Nimiq Pay.</p>
+      <button v-else class="button button--primary button--wide" type="button" :disabled="busy || !campaignToken || !status?.enabled || status.funded >= status.capacity" @click="fundNext">
         {{ busy ? 'Preparing this pot…' : status?.funded === status?.capacity ? 'All twenty are funded' : 'Fund next 5,000 NIM pot' }}
       </button>
     </section>
@@ -173,7 +177,9 @@ async function acceptKindness(): Promise<void> {
       <div v-if="status" class="campaign-meter"><strong>{{ status.remaining }}</strong><span>funded pots waiting</span></div>
       <p class="pass-explainer"><strong>No purchase. No deposit. No referral.</strong> One gift per Nimiq Pay device while funded pots remain. NIM is a cryptoasset and its value can change.</p>
       <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
-      <button class="button button--primary button--wide" type="button" :disabled="busy || !campaignToken || !status?.enabled || status.remaining === 0" @click="acceptKindness">
+      <a v-if="!isInsideNimiqPay && campaignToken && status?.enabled && status.remaining > 0" class="button button--primary button--wide" :href="openInNimiqPayUrl">Open in Nimiq Pay to accept <span aria-hidden="true">↗</span></a>
+      <p v-if="!isInsideNimiqPay && campaignToken && status?.enabled && status.remaining > 0" class="fresh-act-note">Nimiq Pay is needed only to reserve one gift for this device. No purchase or wallet address is required.</p>
+      <button v-else class="button button--primary button--wide" type="button" :disabled="busy || !campaignToken || !status?.enabled || status.remaining === 0" @click="acceptKindness">
         {{ busy
           ? 'Reserving your kindness…'
           : status?.funded === 0

@@ -264,15 +264,25 @@ interface ChainStatsRow {
 async function getChainStats(chainId: string, env: Env): Promise<ChainStatsRow | null> {
   return env.DB.prepare(`
     SELECT
-      SUM(CASE WHEN first_opened_at IS NOT NULL THEN 1 ELSE 0 END) AS links_opened,
+      SUM(CASE WHEN s.first_opened_at IS NOT NULL THEN 1 ELSE 0 END) AS links_opened,
       COUNT(*) AS positive_messages,
-      SUM(CASE WHEN includes_payment = 0 THEN 1 ELSE 0 END) AS message_only_passes,
-      SUM(CASE WHEN includes_payment = 1 THEN 1 ELSE 0 END) AS nim_gift_count,
-      COALESCE(SUM(CASE WHEN includes_payment = 1 THEN payment_luna ELSE 0 END), 0) AS nim_passed_luna,
+      SUM(CASE WHEN s.includes_payment = 0 THEN 1 ELSE 0 END) AS message_only_passes,
+      SUM(CASE WHEN s.includes_payment = 1 THEN 1 ELSE 0 END) AS nim_gift_count,
+      COALESCE(SUM(CASE
+        WHEN s.includes_payment = 1
+          AND (
+            parent.claim_transaction_hash IS NULL
+            OR s.transaction_hash IS NULL
+            OR LOWER(parent.claim_transaction_hash) <> LOWER(s.transaction_hash)
+          )
+        THEN s.payment_luna
+        ELSE 0
+      END), 0) AS nim_passed_luna,
       MIN(s.created_at) AS started_at,
       MAX(s.created_at) AS last_continued_at
     FROM sideways s
     INNER JOIN consents c ON c.sideways_id = s.id
+    LEFT JOIN sideways parent ON parent.id = s.parent_id
     WHERE s.chain_id = ? AND s.status IN ('delivered', 'reported') AND c.allow_aggregate_tracking = 1
   `).bind(chainId).first<ChainStatsRow>()
 }

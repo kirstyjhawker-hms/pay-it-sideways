@@ -439,7 +439,11 @@ describe('Worker API', () => {
     expect(relayedChild.status).toBe(201)
     const relayedView = await dispatch(`/api/sideways/${relayedToken}`)
     expect(await relayedView.json()).toMatchObject({
-      chain: { linksOpened: 3, positiveMessages: 3, nimPassed: 1.4, position: 3 },
+      chain: { linksOpened: 3, positiveMessages: 3, nimPassed: 1.2, position: 3 },
+    })
+    const relayedTrail = await dispatch(`/api/trails/${trailToken}`)
+    expect(await relayedTrail.json()).toMatchObject({
+      chain: { nimGiftCount: 3, nimPassed: 1.2 },
     })
 
     const mismatch = await dispatch('/api/sideways', post({

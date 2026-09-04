@@ -6,7 +6,7 @@ import type { SidewaysResponse } from '../types'
 import KindnessTrail from '../components/KindnessTrail.vue'
 import { track } from '../lib/analytics'
 import { createClaimTransaction, giftSecretFromHash } from '../lib/gift'
-import { getNimiqProvider } from '../lib/nimiq'
+import { getNimiqProvider, nimiqPayDeepLink } from '../lib/nimiq'
 import { t } from '../lib/i18n'
 
 const route = useRoute()
@@ -32,6 +32,8 @@ const giftSecret = computed(() => {
   void route.hash
   return giftSecretFromHash()
 })
+const isInsideNimiqPay = Boolean(window.nimiqPay)
+const openInNimiqPayUrl = nimiqPayDeepLink(window.location.href)
 
 const isClaimableGift = computed(() => data.value?.sideways.paymentMode === 'claimable')
 const needsGiftClaim = computed(() => isClaimableGift.value && !data.value?.sideways.claimed)
@@ -348,13 +350,18 @@ async function report(): Promise<void> {
 
       <section v-if="!kept && !selectingAccount" class="receive-actions" aria-label="What would you like to do?">
         <p v-if="isClaimableGift" class="pass-explainer"><strong>No NIM to buy.</strong> Choose Keep to claim this gift into your account, or pass it so this exact NIM moves straight into the next private link. Passing needs no wallet and none of your own NIM. Pay It Sideways never takes custody.</p>
-        <button class="button button--primary button--wide" type="button" :disabled="keeping" @click="keep">
+        <a v-if="needsGiftClaim && !isInsideNimiqPay" class="button button--primary button--wide" :href="openInNimiqPayUrl">
+          Open in Nimiq Pay to keep it <span aria-hidden="true">↗</span>
+        </a>
+        <p v-if="needsGiftClaim && !isInsideNimiqPay" class="fresh-act-note">This opens the same private link—including its gift key—inside Nimiq Pay. You will still choose the account and approve the claim.</p>
+        <button v-else class="button button--primary button--wide" type="button" :disabled="keeping" @click="keep">
           {{ claimingFor === 'keep' ? 'Claiming your kindness…' : keepLabel }}
         </button>
         <button class="button button--secondary button--wide" type="button" :disabled="Boolean(claimingFor)" @click="passSideways">
           <template v-if="claimingFor === 'pass'">Preparing the next kindness…</template>
           <template v-else>{{ isClaimableGift ? 'Pass this gift forward' : 'Pass it sideways—words or optional NIM' }} <span aria-hidden="true">↗</span></template>
         </button>
+        <p v-if="isClaimableGift" class="fresh-act-note">Use this button to make a fresh private link for the next person. Don’t forward this page’s URL.</p>
         <p v-if="!needsGiftClaim" class="fresh-act-note">{{ t('freshNote') }}</p>
       </section>
 
@@ -366,16 +373,17 @@ async function report(): Promise<void> {
 
       <section v-if="!reported" class="chain-card" aria-labelledby="chain-title">
         <div class="chain-heading">
-          <div><p class="eyebrow">This kindness has travelled</p><h2 id="chain-title">This is note #{{ data.chain.position }} in the chain.</h2></div>
+          <div><p class="eyebrow">This kindness has travelled</p><h2 id="chain-title">Message {{ data.chain.position }} of {{ data.chain.positiveMessages }} in this chain.</h2></div>
           <span class="chain-sprout" aria-hidden="true">🌱</span>
         </div>
         <KindnessTrail :links-opened="data.chain.linksOpened" :position="data.chain.position" />
         <dl>
-          <div><dt>Recipient links opened</dt><dd>{{ data.chain.linksOpened }}</dd></div>
+          <div><dt>Private links opened</dt><dd>{{ data.chain.linksOpened }}</dd></div>
           <div><dt>Notes created</dt><dd>{{ data.chain.positiveMessages }}</dd></div>
           <div><dt>Words-only passes</dt><dd>{{ data.chain.messageOnlyPasses }}</dd></div>
-          <div v-if="data.chain.nimPassed > 0"><dt>NIM attached across this chain</dt><dd>{{ data.chain.nimPassed }}</dd></div>
+          <div v-if="data.chain.nimPassed > 0"><dt>NIM introduced to this chain</dt><dd>{{ data.chain.nimPassed }} NIM</dd></div>
         </dl>
+        <p>Passing creates a new numbered message. Simply forwarding the same private link does not. Relayed NIM is counted once, not again at every step.</p>
         <p>Only anonymous totals are shown. The words above stay private.</p>
       </section>
 

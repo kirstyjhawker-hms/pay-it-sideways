@@ -8,6 +8,8 @@ Primary CTA: **Send one private thank-you today.**
 
 Live app: https://pay-it-sideways.grand-sugar.workers.dev
 
+Stable founder invitation: https://pay-it-sideways.grand-sugar.workers.dev/first-kindness
+
 ## Story arc
 
 1. **The idea** — paying it forward is lovely; paying it sideways thanks the people already beside us.
@@ -275,6 +277,8 @@ Description:
 Use this compact bio on Instagram, Threads and X:
 
 `Private thank-yous with optional NIM 💛 Keep it or pass the exact gift onward. Founder-funded 5,000 NIM gifts available ↓`
+
+Bio link: `https://pay-it-sideways.grand-sugar.workers.dev/first-kindness`
 
 YouTube About text:
 

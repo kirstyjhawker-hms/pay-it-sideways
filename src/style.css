@@ -130,6 +130,12 @@ h1 {
 .home-copy .lead { margin: 18px 0 22px; }
 .audience-note { margin: -6px 0 22px; padding-left: 13px; border-left: 2px solid var(--sun); color: var(--ink-soft, #504e47); font-size: .8rem; line-height: 1.5; }
 .home-wallet-link { margin-top: 10px; }
+.founder-callout { margin: 0 0 18px; padding: 18px; border: 1px solid rgba(245,200,76,.72); border-radius: 20px; background: linear-gradient(145deg, rgba(255,253,248,.88), rgba(245,200,76,.16)); box-shadow: 0 16px 38px rgba(70,59,31,.07); }
+.founder-callout .eyebrow { margin-bottom: 7px; }
+.founder-callout h2 { margin: 0; color: var(--leaf-dark); font-size: 1.25rem; letter-spacing: -.025em; }
+.founder-callout > p:not(.eyebrow) { margin: 8px 0 13px; color: var(--ink-soft); font-size: .82rem; line-height: 1.5; }
+.founder-callout > p strong { color: var(--leaf-dark); font-size: 1rem; }
+.founder-callout small { display: block; margin-top: 9px; color: var(--muted); font-size: .66rem; line-height: 1.45; }
 
 .story-beats {
   display: grid;

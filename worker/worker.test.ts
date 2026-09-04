@@ -53,6 +53,20 @@ function postFrom(body: unknown, address: string): RequestInit {
 }
 
 describe('Worker API', () => {
+  it('serves the public founder invitation through a stable no-store redirect', async () => {
+    const campaignToken = 'C'.repeat(43)
+    const response = await dispatch('/first-kindness', undefined, {
+      ...env,
+      CAMPAIGN_PUBLIC_TOKEN: campaignToken,
+    })
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe(`${origin}/founder-kindness#campaign=${campaignToken}`)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+
+    const unavailable = await dispatch('/first-kindness', undefined, { ...env, CAMPAIGN_PUBLIC_TOKEN: '' })
+    expect(unavailable.status).toBe(503)
+  })
+
   it('allocates each encrypted founder gift once and retries idempotently', async () => {
     const accessToken = 'campaign-access-token-abcdefghijklmnopqrstuvwxyz'
     const adminToken = 'campaign-admin-token-abcdefghijklmnopqrstuvwxyz'

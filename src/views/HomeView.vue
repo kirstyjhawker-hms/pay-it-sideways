@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { getNimiqProvider, nimiqPayDeepLink } from '../lib/nimiq'
+import { getCampaignStatus, type CampaignStatus } from '../lib/api'
 import { track } from '../lib/analytics'
 import { listSentLinks } from '../lib/sentLinks'
 import { t } from '../lib/i18n'
@@ -11,6 +12,7 @@ type ConnectionState = 'ready' | 'offline'
 const connectionState = ref<ConnectionState>('offline')
 const consensusEstablished = ref(false)
 const hasSentLinks = ref(false)
+const campaignStatus = ref<CampaignStatus>()
 const isInsideNimiqPay = Boolean(window.nimiqPay)
 const openInNimiqPayUrl = nimiqPayDeepLink(new URL('/create', window.location.origin).toString())
 
@@ -22,6 +24,7 @@ const walletLabel = computed(() => {
 
 onMounted(async () => {
   hasSentLinks.value = listSentLinks().length > 0
+  try { campaignStatus.value = await getCampaignStatus() } catch { /* The core app remains available. */ }
   try {
     const provider = await getNimiqProvider()
     consensusEstablished.value = await provider.isConsensusEstablished()
@@ -60,6 +63,16 @@ onMounted(async () => {
           <div><strong>{{ t('chooseTitle') }}</strong><p>{{ t('chooseBody') }}</p></div>
         </li>
       </ol>
+
+      <aside v-if="campaignStatus && campaignStatus.remaining > 0" class="founder-callout" aria-labelledby="founder-title">
+        <p class="eyebrow">Founder-funded invitation</p>
+        <h2 id="founder-title">{{ t('founderTitle') }}</h2>
+        <p><strong>{{ campaignStatus.remaining }}</strong> {{ t('founderWaiting') }}</p>
+        <a class="button button--primary button--wide" href="/first-kindness">
+          {{ t('founderCta') }} <span aria-hidden="true">→</span>
+        </a>
+        <small>{{ t('founderNote') }}</small>
+      </aside>
 
       <RouterLink class="button button--primary button--wide" to="/create" @click="track('create_started')">
         {{ t('start') }} <span aria-hidden="true">→</span>

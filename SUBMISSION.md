@@ -40,7 +40,7 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - **A real need:** thank a friend, colleague, carer or quiet supporter privately without first asking for their wallet address or making kindness performative.
 - **Resilient by design:** funded drafts survive interruption; saves and claims are idempotent; failed link/trail loads can be retried; pending claims can be confirmed or safely rebroadcast.
 - **Repeat value:** device-only sent-link history and private sender trails let people revisit links and watch a chain grow without exposing recipients or messages.
-- **Proven beyond a demo:** 38 automated tests plus a real Mainnet three-device founder-gift journey covering Accept → Pass → Keep with 5,000 NIM.
+- **Proven beyond a demo:** 39 automated tests plus a real Mainnet three-device founder-gift journey covering Accept → Pass → Keep with 5,000 NIM.
 
 ### Nimiq integration
 
@@ -83,7 +83,7 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Claimable link requires no recipient address
 - [x] Funding and claim records are verified against the blockchain
 - [x] Mobile widths, tap targets, focus states, and reduced motion checked
-- [x] 38 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
+- [x] 39 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
 - [x] Real Mainnet three-device founder-gift Accept → link-to-link Pass → Keep completed with 5,000 NIM
 - [x] Cloudflare authentication, D1 creation/migration, and production deployment
 - [x] Public GitHub repository published and URL inserted above

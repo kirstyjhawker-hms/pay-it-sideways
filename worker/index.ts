@@ -6,6 +6,7 @@ interface Env {
   RATE_LIMIT_SECRET?: string
   CAMPAIGN_ACCESS_HASH?: string
   CAMPAIGN_ADMIN_HASH?: string
+  CAMPAIGN_PUBLIC_TOKEN?: string
 }
 
 const campaignGiftLuna = 500_000_000
@@ -1001,6 +1002,20 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+    if (request.method === 'GET' && url.pathname === '/first-kindness') {
+      if (!env.CAMPAIGN_PUBLIC_TOKEN || !/^[A-Za-z0-9_-]{43}$/.test(env.CAMPAIGN_PUBLIC_TOKEN)) {
+        return withSecurityHeaders(new Response('The founder invitation is temporarily unavailable.', {
+          status: 503,
+          headers: { 'cache-control': 'no-store' },
+        }))
+      }
+      const destination = new URL('/founder-kindness', url.origin)
+      destination.hash = `campaign=${env.CAMPAIGN_PUBLIC_TOKEN}`
+      return withSecurityHeaders(new Response(null, {
+        status: 302,
+        headers: { location: destination.toString(), 'cache-control': 'no-store' },
+      }))
+    }
     if (url.pathname.startsWith('/api/')) return handleApi(request, env)
     return withSecurityHeaders(await env.ASSETS.fetch(request))
   },

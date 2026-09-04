@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { broadcastGiftClaim, confirmGiftClaim, createSideways, detectNimiqNetwork, getGiftState, getSideways } from '../lib/api'
-import { getNimiqProvider } from '../lib/nimiq'
+import { getReadyNimiqProvider } from '../lib/nimiq'
 import { createClaimTransaction, generateGiftKey, giftSecretFromHash, type GiftKey, type NimiqNetwork } from '../lib/gift'
 import { parseNimToLuna } from '../lib/money'
 import { track } from '../lib/analytics'
@@ -48,6 +48,7 @@ const recipientToken = ref(generateRecipientToken())
 const trailToken = ref(generateRecipientToken())
 const errorMessage = ref('')
 const messageInput = ref<HTMLTextAreaElement>()
+const stepHeading = ref<HTMLElement>()
 
 const parentToken = computed(() => typeof route.query.parent === 'string' ? route.query.parent : undefined)
 const isContinuation = computed(() => Boolean(parentToken.value))
@@ -121,15 +122,30 @@ onMounted(() => {
   }
 })
 
+async function focusStepHeading(): Promise<void> {
+  await nextTick()
+  stepHeading.value?.focus()
+}
+
+function goBack(): void {
+  if (step.value <= 1 || submitting.value) return
+  step.value -= 1
+  void focusStepHeading()
+}
+
 function goToPayment(): void {
   if (reasonReady.value && messageReady.value) {
     track('message_completed')
     step.value = 2
+    void focusStepHeading()
   }
 }
 
 function goToReview(): void {
-  if (paymentReady.value) step.value = 3
+  if (paymentReady.value) {
+    step.value = 3
+    void focusStepHeading()
+  }
 }
 
 function useStarter(starter: string): void {
@@ -169,7 +185,7 @@ function paymentError(error: unknown): string {
 
 async function sendNim(): Promise<string> {
   if (lunaValue.value === null) throw new Error('Check the NIM amount.')
-  const provider = await getNimiqProvider()
+  const provider = await getReadyNimiqProvider()
   giftKey.value ??= await generateGiftKey()
   persistPendingGift()
   const result = await provider.sendBasicTransaction({
@@ -308,7 +324,7 @@ async function submit(): Promise<void> {
 <template>
   <main class="screen create-screen">
     <nav class="flow-nav" aria-label="Creation progress">
-      <button v-if="step > 1" class="back-button" type="button" :disabled="submitting" @click="step--">
+      <button v-if="step > 1" class="back-button" type="button" :disabled="submitting" @click="goBack">
         <span aria-hidden="true">←</span> Back
       </button>
       <RouterLink v-else class="back-button" to="/"><span aria-hidden="true">←</span> Home</RouterLink>
@@ -318,7 +334,7 @@ async function submit(): Promise<void> {
     <Transition name="step" mode="out-in">
       <section v-if="step === 1" key="message" class="flow-card" aria-labelledby="reason-title">
         <p class="eyebrow">{{ isContinuation ? 'Keep it moving' : 'Start with the person' }}</p>
-        <h1 id="reason-title">Why did this person come to mind?</h1>
+        <h1 id="reason-title" ref="stepHeading" tabindex="-1">Why did this person come to mind?</h1>
         <p class="supporting">What have they done, or what do you appreciate about them?</p>
         <label class="field-label" for="reason">Your reason</label>
         <textarea id="reason" v-model="reason" rows="3" maxlength="160" placeholder="You always check in when things get hectic."></textarea>
@@ -335,7 +351,7 @@ async function submit(): Promise<void> {
 
       <section v-else-if="step === 2" key="payment" class="flow-card" aria-labelledby="payment-title">
         <p class="eyebrow">The words already count</p>
-        <h1 id="payment-title">{{ isCarryingGift ? 'Pass the gift with it?' : 'Add a little something?' }}</h1>
+        <h1 id="payment-title" ref="stepHeading" tabindex="-1">{{ isCarryingGift ? 'Pass the gift with it?' : 'Add a little something?' }}</h1>
         <p class="supporting">{{ isCarryingGift ? 'This exact gift will move directly into the next private link. It never passes through your wallet or Pay It Sideways.' : isContinuation ? 'This is a new note: add any amount you choose, or just your words.' : 'Completely optional. The message is the heart of this.' }}</p>
 
         <div v-if="isCarryingGift" class="words-choice">
@@ -367,7 +383,7 @@ async function submit(): Promise<void> {
 
       <section v-else key="review" class="flow-card" aria-labelledby="review-title">
         <p class="eyebrow">One last look</p>
-        <h1 id="review-title">Ready to send it sideways?</h1>
+        <h1 id="review-title" ref="stepHeading" tabindex="-1">Ready to send it sideways?</h1>
         <article class="note-preview"><p class="note-reason">{{ reason }}</p><p class="note-message">“{{ message }}”</p></article>
 
         <div class="words-choice" aria-label="What is attached">

@@ -11,7 +11,9 @@ const data = ref<TrailResponse>()
 const loading = ref(true)
 const errorMessage = ref('')
 
-onMounted(async () => {
+async function loadTrail(): Promise<void> {
+  loading.value = true
+  errorMessage.value = ''
   try {
     data.value = await getTrail(token.value)
   } catch (error) {
@@ -19,7 +21,9 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadTrail)
 
 function dateLabel(value: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
@@ -34,6 +38,7 @@ function dateLabel(value: string): string {
     <div v-if="loading" class="loading-state" role="status"><span class="loading-heart" aria-hidden="true">💛</span><p>Following the trail…</p></div>
     <section v-else-if="errorMessage" class="empty-state" role="alert">
       <h1>This trail isn’t available.</h1><p>{{ errorMessage }}</p>
+      <button class="button button--primary" type="button" @click="loadTrail">Try again</button>
       <RouterLink class="button button--secondary" to="/">Return home</RouterLink>
     </section>
     <section v-else-if="data" class="trail-dashboard" aria-labelledby="trail-title">

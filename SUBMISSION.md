@@ -32,6 +32,30 @@ Nimiq is integral to the addressless gift experience. Nimiq Pay confirms the fun
 
 Crypto gifting normally begins with plumbing: “What is your wallet address?” Pay It Sideways begins with the person. I wanted a product where a sincere sentence still feels whole at 0 NIM, while a tiny payment can add something tangible without becoming a score, status symbol, or social debt. The difficult part was making one link preserve the recipient’s choice. The resulting addressless bearer gift keeps wallet mechanics quiet, uses real NIM, and lets a message reach someone who has never exchanged an address with the sender.
 
+## Judge evidence map
+
+### Functionality and usefulness
+
+- **Complete core journey:** words-only Send → Receive → Keep/Pass, plus funded Send → Accept → direct link-to-link Pass → Keep.
+- **A real need:** thank a friend, colleague, carer or quiet supporter privately without first asking for their wallet address or making kindness performative.
+- **Resilient by design:** funded drafts survive interruption; saves and claims are idempotent; failed link/trail loads can be retried; pending claims can be confirmed or safely rebroadcast.
+- **Repeat value:** device-only sent-link history and private sender trails let people revisit links and watch a chain grow without exposing recipients or messages.
+- **Proven beyond a demo:** 38 automated tests plus a real Mainnet three-device founder-gift journey covering Accept → Pass → Keep with 5,000 NIM.
+
+### Nimiq integration
+
+- Uses the official Mini App SDK for native account selection and transaction approval, with a readiness guard while Nimiq Pay is syncing.
+- Verifies network, sender, recipient, exact Luna amount and transaction state; fabricated funding and invalid relays are rejected.
+- Nimiq enables the product's central promise: an attached gift can travel by private link without the sender knowing the recipient's address.
+- The app is non-custodial: the server never receives the gift private key and an exact relayed gift moves directly between one-use Nimiq accounts.
+
+### Design and UX
+
+- Mobile-first three-beat onboarding, progressive disclosure, plain-language NIM choices and a complete words-only path.
+- Recipient choices explain the consequence before action; verified badges name Mainnet/Testnet and error states preserve the user's work.
+- Keyboard focus follows each creation step, tap targets support touch, reduced motion is respected, and compact screens down to 320 px are supported.
+- Four-language homepage, private-share warnings, report controls, and a direct **Open in Nimiq Pay** entry point reduce avoidable friction.
+
 ## 60-second walkthrough
 
 1. Open Pay It Sideways inside Nimiq Pay; let the three-beat story establish person → private link → choice.
@@ -59,8 +83,8 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Claimable link requires no recipient address
 - [x] Funding and claim records are verified against the blockchain
 - [x] Mobile widths, tap targets, focus states, and reduced motion checked
-- [x] 31 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
-- [ ] Real Testnet Send → link-to-link Pass → Claim rerun in the current Nimiq Pay build
+- [x] 38 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
+- [x] Real Mainnet three-device founder-gift Accept → link-to-link Pass → Keep completed with 5,000 NIM
 - [x] Cloudflare authentication, D1 creation/migration, and production deployment
 - [x] Public GitHub repository published and URL inserted above
 - [x] Production link tested inside Nimiq Pay, including native share/copy
@@ -68,4 +92,4 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Public walkthrough recorded and uploaded
 - [x] Contact email, confirmed GitHub login, X account, and personal payout NIM address entered
 - [x] Submission portal sent as PR #100
-- [ ] Repair PR #101 merged and PR #100 rerun with every external check passing
+- [x] Repair PR #101 merged and PR #100 rerun with every external check passing

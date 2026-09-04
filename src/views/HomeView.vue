@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { getNimiqProvider } from '../lib/nimiq'
+import { getNimiqProvider, nimiqPayDeepLink } from '../lib/nimiq'
 import { track } from '../lib/analytics'
 import { listSentLinks } from '../lib/sentLinks'
 import { t } from '../lib/i18n'
@@ -11,6 +11,8 @@ type ConnectionState = 'ready' | 'offline'
 const connectionState = ref<ConnectionState>('offline')
 const consensusEstablished = ref(false)
 const hasSentLinks = ref(false)
+const isInsideNimiqPay = Boolean(window.nimiqPay)
+const openInNimiqPayUrl = nimiqPayDeepLink(new URL('/create', window.location.origin).toString())
 
 const walletLabel = computed(() => {
   if (connectionState.value === 'ready' && consensusEstablished.value) return 'Ready inside Nimiq Pay'
@@ -42,6 +44,7 @@ onMounted(async () => {
       <p class="lead">
         {{ t('homeLead') }}
       </p>
+      <p class="audience-note">{{ t('homeAudience') }}</p>
 
       <ol class="story-beats" aria-label="How Pay It Sideways works">
         <li>
@@ -61,6 +64,9 @@ onMounted(async () => {
       <RouterLink class="button button--primary button--wide" to="/create" @click="track('create_started')">
         {{ t('start') }} <span aria-hidden="true">→</span>
       </RouterLink>
+      <a v-if="!isInsideNimiqPay" class="button button--secondary button--wide home-wallet-link" :href="openInNimiqPayUrl">
+        Open in Nimiq Pay to include NIM <span aria-hidden="true">↗</span>
+      </a>
       <RouterLink v-if="hasSentLinks" class="recent-link" to="/history">{{ t('recent') }}</RouterLink>
 
       <div class="quiet-status" role="status" aria-live="polite">

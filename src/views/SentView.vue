@@ -16,6 +16,7 @@ const sentSummary = computed<Partial<SentLink>>(() => {
   } catch { return {} }
 })
 const missingGiftKey = computed(() => sentSummary.value.includesGift === true && !giftSecret.value)
+const paymentNetworkLabel = computed(() => sentSummary.value.paymentNetwork === 'main' ? 'Mainnet' : 'Testnet')
 const shareUrl = computed(() => {
   return recipientUrl(window.location.origin, token.value, giftSecret.value)
 })
@@ -72,7 +73,7 @@ async function copyLink(): Promise<void> {
       <p v-if="giftSecret" class="privacy-note">The complete claim link is recoverable on this device so you can share it again. Anyone with that complete link can claim the attached NIM—send it only to the intended person.</p>
       <p v-if="giftSecret" class="privacy-note">If it goes to the wrong person, use Recent links to open the recipient view and reclaim the gift into your own account before anyone else claims it.</p>
       <p v-if="missingGiftKey" class="error-message" role="alert">The private gift key is missing on this device. Do not share this incomplete link.</p>
-      <p v-if="sentSummary.includesGift && sentSummary.transactionHash" class="verified-badge"><span aria-hidden="true">✓</span> Funding verified on Nimiq</p>
+      <p v-if="sentSummary.includesGift && sentSummary.transactionHash" class="verified-badge"><span aria-hidden="true">✓</span> Funding verified on Nimiq {{ paymentNetworkLabel }}</p>
       <button class="button button--primary button--wide" type="button" :disabled="missingGiftKey" @click="share">
         Share with them <span aria-hidden="true">↗</span>
       </button>

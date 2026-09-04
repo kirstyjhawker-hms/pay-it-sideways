@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nimiqPayDeepLink } from './nimiq'
+import { nimiqPayDeepLink, requireNimiqConsensus } from './nimiq'
 
 describe('Nimiq Pay deep links', () => {
   it('preserves a complete private recipient URL, including its gift fragment', () => {
@@ -13,5 +13,13 @@ describe('Nimiq Pay deep links', () => {
 
   it('rejects non-web schemes', () => {
     expect(() => nimiqPayDeepLink('javascript:alert(1)')).toThrow('Only web links')
+  })
+})
+
+describe('Nimiq readiness', () => {
+  it('continues only when wallet consensus is established', async () => {
+    await expect(requireNimiqConsensus({ isConsensusEstablished: async () => true })).resolves.toBeUndefined()
+    await expect(requireNimiqConsensus({ isConsensusEstablished: async () => false }))
+      .rejects.toThrow('still syncing')
   })
 })

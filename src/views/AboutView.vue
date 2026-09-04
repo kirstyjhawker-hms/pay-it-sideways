@@ -43,6 +43,16 @@ async function chooseAnalytics(allowed: boolean): Promise<void> {
       <p class="about-callout">There is never an obligation to continue a chain or attach money. Message-only participation is complete participation.</p>
     </section>
 
+    <section class="about-section" aria-labelledby="nimiq-title">
+      <h2 id="nimiq-title">Built around Nimiq—not bolted onto it</h2>
+      <ul class="integration-list">
+        <li><strong>Native approval.</strong> Funding and account selection happen through Nimiq Pay; the app never sees a wallet key.</li>
+        <li><strong>Verified on-chain.</strong> A funded link is created only after its exact transaction, amount, network and one-use address are confirmed.</li>
+        <li><strong>No address exchange.</strong> The recipient privately chooses their own Nimiq account only when claiming.</li>
+        <li><strong>Non-custodial relay.</strong> Passing moves the same gift from one temporary link account to the next. It never enters the recipient’s wallet or Pay It Sideways first.</li>
+      </ul>
+    </section>
+
     <section class="about-section" aria-labelledby="privacy-title">
       <h2 id="privacy-title">Privacy</h2>
       <h3>What is stored</h3>

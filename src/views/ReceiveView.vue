@@ -6,7 +6,7 @@ import type { SidewaysResponse } from '../types'
 import KindnessTrail from '../components/KindnessTrail.vue'
 import { track } from '../lib/analytics'
 import { createClaimTransaction, giftSecretFromHash } from '../lib/gift'
-import { getNimiqProvider, nimiqPayDeepLink } from '../lib/nimiq'
+import { getReadyNimiqProvider, nimiqPayDeepLink } from '../lib/nimiq'
 import { t } from '../lib/i18n'
 
 const route = useRoute()
@@ -34,6 +34,7 @@ const giftSecret = computed(() => {
 })
 const isInsideNimiqPay = Boolean(window.nimiqPay)
 const openInNimiqPayUrl = nimiqPayDeepLink(window.location.href)
+const openedTracked = ref(false)
 
 const isClaimableGift = computed(() => data.value?.sideways.paymentMode === 'claimable')
 const needsGiftClaim = computed(() => isClaimableGift.value && !data.value?.sideways.claimed)
@@ -46,11 +47,17 @@ const giftIsReady = computed(() => {
     && typeof amount === 'number'
     && giftBalance.value >= Math.round(amount * 100_000)
 })
+const giftNetworkLabel = computed(() => data.value?.sideways.paymentNetwork === 'main' ? 'Mainnet' : 'Testnet')
 
-onMounted(async () => {
+async function loadSideways(): Promise<void> {
+  loading.value = true
+  errorMessage.value = ''
   try {
     data.value = await getSideways(token.value)
-    track('recipient_opened')
+    if (!openedTracked.value) {
+      track('recipient_opened')
+      openedTracked.value = true
+    }
     kept.value = data.value.sideways.kept
     reported.value = data.value.sideways.reported
     if (data.value.sideways.paymentMode === 'claimable' && !data.value.sideways.claimed) {
@@ -61,7 +68,9 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadSideways)
 
 async function refreshGiftBalance(): Promise<void> {
   checkingGift.value = true
@@ -143,7 +152,7 @@ async function claimGift(recipient?: string): Promise<'claimed' | 'selecting' | 
     }
     if (!transactionHash) {
       if (!giftSecret.value) throw new Error('This link is missing the private gift key. Ask the sender to share the complete link again.')
-      const provider = await getNimiqProvider()
+      const provider = await getReadyNimiqProvider()
       if (!recipient) {
         const accounts = await provider.listAccounts()
         if (!Array.isArray(accounts) || !accounts[0]) throw accounts
@@ -289,6 +298,7 @@ async function report(): Promise<void> {
     <section v-else-if="errorMessage && !data" class="empty-state" role="alert">
       <h1>This note isn’t available.</h1>
       <p>{{ errorMessage }}</p>
+      <button class="button button--primary" type="button" @click="loadSideways">Try again</button>
       <RouterLink class="button button--secondary" to="/">Return home</RouterLink>
     </section>
 
@@ -325,7 +335,7 @@ async function report(): Promise<void> {
             </template>
           </div>
         </div>
-        <p v-if="data.sideways.includesPayment && (giftIsReady || data.sideways.claimed)" class="verified-badge"><span aria-hidden="true">✓</span> {{ t(data.sideways.claimed ? 'verifiedClaim' : 'verifiedGift') }}</p>
+        <p v-if="data.sideways.includesPayment && (giftIsReady || data.sideways.claimed)" class="verified-badge"><span aria-hidden="true">✓</span> {{ t(data.sideways.claimed ? 'verifiedClaim' : 'verifiedGift') }} · {{ giftNetworkLabel }}</p>
         <p class="no-obligation">There is nothing you need to do in return.</p>
       </section>
 

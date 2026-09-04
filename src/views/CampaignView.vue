@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { addCampaignSlot, allocateCampaignGift, createSideways, detectNimiqNetwork, getCampaignStatus, type CampaignStatus } from '../lib/api'
 import { decryptCampaignGift, encryptCampaignGift } from '../lib/campaign'
 import { generateGiftKey, normalizeNetwork, type GiftKey, type NimiqNetwork } from '../lib/gift'
-import { getNimiqProvider, nimiqPayDeepLink } from '../lib/nimiq'
+import { getReadyNimiqProvider, nimiqPayDeepLink } from '../lib/nimiq'
 import { saveGiftSecret, saveSentLink } from '../lib/sentLinks'
 
 interface PendingSlot {
@@ -84,7 +84,7 @@ async function fundNext(): Promise<void> {
       savePending(pending)
     }
     if (!pending.transactionHash) {
-      const provider = await getNimiqProvider()
+      const provider = await getReadyNimiqProvider()
       if (normalizeNetwork(provider.getNetwork()) !== 'main') {
         throw new Error('Switch Nimiq Pay to Mainnet before funding founder gifts. No transaction has been requested.')
       }

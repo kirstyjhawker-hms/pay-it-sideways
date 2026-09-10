@@ -35,7 +35,7 @@ function generateRecipientToken(): string {
 const route = useRoute()
 const router = useRouter()
 const step = ref(1)
-const reason = ref('')
+const reason = ref('You came to mind today.')
 const message = ref('')
 const isCarryingGift = computed(() => route.query.carry === 'gift' && typeof route.query.parent === 'string')
 const paymentChoice = ref<PaymentChoice>(isCarryingGift.value ? 'nim' : 'words')
@@ -52,20 +52,37 @@ const stepHeading = ref<HTMLElement>()
 
 const parentToken = computed(() => typeof route.query.parent === 'string' ? route.query.parent : undefined)
 const isContinuation = computed(() => Boolean(parentToken.value))
-const reasonReady = computed(() => reason.value.trim().length >= 3)
 const messageReady = computed(() => message.value.trim().length >= 8)
 const lunaValue = computed(() => parseNimToLuna(nimAmount.value))
 const paymentReady = computed(() => paymentChoice.value === 'words' || lunaValue.value !== null)
 const submitting = computed(() => submissionState.value !== 'idle')
 const stepLabel = computed(() => ['Write', 'Optional gift', 'Send'][step.value - 1])
 
-const starters = [
+type OccasionKey = 'helped' | 'encouragement' | 'colleague' | 'celebrate' | 'just-because'
+
+const occasions: Array<{ key: OccasionKey; label: string; reason: string; placeholder: string; starters: string[] }> = [
+  { key: 'helped', label: 'They helped me', reason: 'You helped when it mattered.', placeholder: 'You made a difficult thing feel manageable, and I really appreciated it.', starters: ['I don’t think I thanked you properly for…', 'You made a difference to me when…'] },
+  { key: 'encouragement', label: 'They need a lift', reason: 'You deserve some encouragement.', placeholder: 'You have been carrying a lot lately. I hope you know how much strength I see in you.', starters: ['Just in case nobody has told you today…', 'I hope this makes your day a little brighter…'] },
+  { key: 'colleague', label: 'Recognise a colleague', reason: 'Your contribution was noticed.', placeholder: 'You quietly made our work easier, and I want you to know it did not go unnoticed.', starters: ['Something I really appreciate about working with you is…', 'The way you showed up for the team mattered because…'] },
+  { key: 'celebrate', label: 'Celebrate something', reason: 'You did something worth celebrating.', placeholder: 'You earned this moment. I hope you take time to feel proud of what you achieved.', starters: ['I hope you take a moment to feel proud of…', 'You earned this moment because…'] },
+  { key: 'just-because', label: 'Just because', reason: 'You came to mind today.', placeholder: 'I thought of you and wanted you to know how much I appreciate having you in my life.', starters: ['I don’t think I tell you enough…', 'Something I really appreciate about you is…'] },
+]
+const selectedOccasion = ref<OccasionKey>()
+const defaultStarters = [
   'I don’t think I tell you enough…',
   'Something I really appreciate about you is…',
   'Just in case nobody has told you today…',
   'I hope this makes your day a little brighter…',
   'You made a difference to me when…',
 ]
+const activeOccasion = computed(() => occasions.find((item) => item.key === selectedOccasion.value))
+const starters = computed(() => activeOccasion.value?.starters ?? defaultStarters)
+const messagePlaceholder = computed(() => activeOccasion.value?.placeholder ?? 'You always check in when things get hectic. I hope you know how appreciated you are.')
+
+function chooseOccasion(key: OccasionKey): void {
+  selectedOccasion.value = selectedOccasion.value === key ? undefined : key
+  reason.value = activeOccasion.value?.reason ?? 'You came to mind today.'
+}
 
 function persistPendingGift(): void {
   if (!giftKey.value) return
@@ -134,7 +151,7 @@ function goBack(): void {
 }
 
 function goToPayment(): void {
-  if (reasonReady.value && messageReady.value) {
+  if (messageReady.value) {
     track('message_completed')
     step.value = 2
     void focusStepHeading()
@@ -249,7 +266,7 @@ async function findPaymentNetwork(transactionHash: string): Promise<NimiqNetwork
 }
 
 async function submit(): Promise<void> {
-  if (submitting.value || !reasonReady.value || !messageReady.value || !paymentReady.value) return
+  if (submitting.value || !messageReady.value || !paymentReady.value) return
   errorMessage.value = ''
 
   try {
@@ -332,21 +349,24 @@ async function submit(): Promise<void> {
     </nav>
 
     <Transition name="step" mode="out-in">
-      <section v-if="step === 1" key="message" class="flow-card" aria-labelledby="reason-title">
+      <section v-if="step === 1" key="message" class="flow-card" aria-labelledby="note-title">
         <p class="eyebrow">{{ isContinuation ? 'Keep it moving' : 'Start with the person' }}</p>
-        <h1 id="reason-title" ref="stepHeading" tabindex="-1">Why did this person come to mind?</h1>
-        <p class="supporting">What have they done, or what do you appreciate about them?</p>
-        <label class="field-label" for="reason">Your reason</label>
-        <textarea id="reason" v-model="reason" rows="3" maxlength="160" placeholder="You always check in when things get hectic."></textarea>
-        <div class="field-meta"><span>Just enough to make it personal.</span><span>{{ reason.length }}/160</span></div>
-        <h2 id="message-title" class="prompt-heading">Now, what would you like them to hear?</h2>
+        <h1 id="note-title" ref="stepHeading" tabindex="-1">What would you like them to hear?</h1>
+        <p class="supporting">One honest note for one specific person.</p>
+        <fieldset class="occasion-picker">
+          <legend>What brought you here? <span>Optional</span></legend>
+          <div class="occasion-row">
+            <button v-for="occasion in occasions" :key="occasion.key" type="button" :class="{ selected: selectedOccasion === occasion.key }" :aria-pressed="selectedOccasion === occasion.key" @click="chooseOccasion(occasion.key)">{{ occasion.label }}</button>
+          </div>
+        </fieldset>
+        <h2 id="message-title" class="prompt-heading">Need a way to begin?</h2>
         <div class="starter-row" aria-label="Optional message starters">
           <button v-for="starter in starters" :key="starter" type="button" @click="useStarter(starter)">{{ starter }}</button>
         </div>
-        <label class="field-label" for="message">Your message</label>
-        <textarea id="message" ref="messageInput" v-model="message" rows="5" maxlength="600" placeholder="I hope you know how appreciated you are." @keydown.ctrl.enter="goToPayment"></textarea>
-        <div class="field-meta"><span>Write it in your own voice.</span><span>{{ message.length }}/600</span></div>
-        <button class="button button--primary button--wide" type="button" :disabled="!reasonReady || !messageReady" @click="goToPayment">Continue <span aria-hidden="true">→</span></button>
+        <label class="field-label" for="message">Your note</label>
+        <textarea id="message" ref="messageInput" v-model="message" rows="7" maxlength="600" :placeholder="messagePlaceholder" @keydown.ctrl.enter="goToPayment"></textarea>
+        <div class="field-meta"><span>Write it in your own voice. Only they receive it.</span><span>{{ message.length }}/600</span></div>
+        <button class="button button--primary button--wide" type="button" :disabled="!messageReady" @click="goToPayment">Continue <span aria-hidden="true">→</span></button>
       </section>
 
       <section v-else-if="step === 2" key="payment" class="flow-card" aria-labelledby="payment-title">
@@ -384,7 +404,7 @@ async function submit(): Promise<void> {
       <section v-else key="review" class="flow-card" aria-labelledby="review-title">
         <p class="eyebrow">One last look</p>
         <h1 id="review-title" ref="stepHeading" tabindex="-1">Ready to send it sideways?</h1>
-        <article class="note-preview"><p class="note-reason">{{ reason }}</p><p class="note-message">“{{ message }}”</p></article>
+        <article class="note-preview"><p class="note-message">“{{ message }}”</p></article>
 
         <div class="words-choice" aria-label="What is attached">
           <span v-if="paymentChoice === 'words'" class="choice-icon" aria-hidden="true">💌</span>
@@ -396,7 +416,7 @@ async function submit(): Promise<void> {
           <span class="choice-check" aria-hidden="true">✓</span>
         </div>
 
-        <p class="privacy-note">The message stays private to anyone with its unguessable link. Anonymous totals let you watch its trail later—never the words, wallets, or recipient choices.</p>
+        <p class="privacy-note">Anyone with the complete, unguessable link can read this note, so send it only to the person you chose. Anonymous totals let you watch its trail later—never the words, wallets, or recipient choices.</p>
         <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
         <button class="button button--primary button--wide" type="button" :disabled="submitting" @click="submit">
           <span v-if="submissionState === 'confirming'">{{ isCarryingGift ? 'Moving the gift securely…' : 'Confirm in Nimiq Pay…' }}</span>

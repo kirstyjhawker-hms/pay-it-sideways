@@ -66,6 +66,7 @@ async function chooseAnalytics(allowed: boolean): Promise<void> {
         <li>The recent-links list is also device-only. It stores the random token, creation time and whether NIM is attached—not the note’s words. Clearing site data removes the list and recovery keys.</li>
         <li>For the limited founder campaign, each already-funded private gift link is encrypted before storage. When someone accepts one, Nimiq Pay supplies a per-site device identifier; the app stores only a keyed one-way hash so the same device receives the same single gift rather than consuming another.</li>
         <li>Whether the recipient chose “keep” or reported the message.</li>
+        <li>An optional preset acknowledgement such as “This made me smile.” It is shown only as an anonymous count in the sender’s private trail; no reply text or identity is collected.</li>
       </ul>
       <h3>Why it is stored</h3>
       <p>Only to deliver the private recipient experience, let a recipient continue the correct chain, prevent duplicate payment records, and calculate anonymous chain totals.</p>

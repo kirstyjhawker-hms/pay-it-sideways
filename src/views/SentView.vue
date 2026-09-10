@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { track } from '../lib/analytics'
 import { listSentLinks, readGiftSecret, recipientUrl, type SentLink } from '../lib/sentLinks'
+import { kindnessShareText } from '../lib/share'
 
 const route = useRoute()
 const token = computed(() => String(route.params.token))
@@ -20,31 +21,33 @@ const paymentNetworkLabel = computed(() => sentSummary.value.paymentNetwork === 
 const shareUrl = computed(() => {
   return recipientUrl(window.location.origin, token.value, giftSecret.value)
 })
-const shared = ref(false)
+const shareStatus = ref<'shared' | 'copied' | ''>('')
 const copyFailed = ref(false)
 
 async function share(): Promise<void> {
   track('share_started')
-  shared.value = false
+  shareStatus.value = ''
   copyFailed.value = false
   const shareData = {
     title: 'Someone sent some kindness your way',
-    text: 'A little kindness is waiting for you 💛',
-    url: shareUrl.value,
+    // Some email share targets discard the Web Share API's separate `url`
+    // field. Keeping the complete private URL in `text` preserves fragments
+    // such as the one-use gift key in every share target.
+    text: kindnessShareText(shareUrl.value),
   }
   try {
     if (navigator.share) {
       await navigator.share(shareData)
-      shared.value = true
+      shareStatus.value = 'shared'
     } else {
       await navigator.clipboard.writeText(shareUrl.value)
-      shared.value = true
+      shareStatus.value = 'copied'
     }
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return
     try {
       await navigator.clipboard.writeText(shareUrl.value)
-      shared.value = true
+      shareStatus.value = 'copied'
     } catch {
       copyFailed.value = true
     }
@@ -52,11 +55,11 @@ async function share(): Promise<void> {
 }
 
 async function copyLink(): Promise<void> {
-  shared.value = false
+  shareStatus.value = ''
   copyFailed.value = false
   try {
     await navigator.clipboard.writeText(shareUrl.value)
-    shared.value = true
+    shareStatus.value = 'copied'
   } catch {
     copyFailed.value = true
   }
@@ -78,7 +81,7 @@ async function copyLink(): Promise<void> {
         Share with them <span aria-hidden="true">↗</span>
       </button>
       <button class="button button--secondary button--wide" type="button" :disabled="missingGiftKey" @click="copyLink">Copy private link</button>
-      <p v-if="shared" class="success-message" role="status">Link copied.</p>
+      <p v-if="shareStatus" class="success-message" role="status">{{ shareStatus === 'shared' ? 'Private link shared.' : 'Private link copied.' }}</p>
       <div v-if="copyFailed" class="manual-link">
         <label for="share-link">Copy this private link</label>
         <input id="share-link" :value="shareUrl" readonly @focus="($event.target as HTMLInputElement).select()" />

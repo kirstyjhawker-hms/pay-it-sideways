@@ -13,7 +13,9 @@ function recoverable(token: string, includesGift: boolean): boolean {
 }
 
 function reclaimUrl(token: string): string {
-  return recipientUrl(window.location.origin, token, readGiftSecret(token))
+  const url = new URL(recipientUrl(window.location.origin, token, readGiftSecret(token)))
+  url.searchParams.set('reclaim', '1')
+  return url.toString()
 }
 </script>
 

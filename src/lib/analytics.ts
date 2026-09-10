@@ -7,6 +7,7 @@ export type AnalyticsEvent =
   | 'share_started'
   | 'recipient_opened'
   | 'recipient_kept'
+  | 'recipient_acknowledged'
   | 'continuation_started'
   | 'continuation_completed'
   | 'message_only_used'

@@ -11,6 +11,8 @@
 | Repository | https://github.com/kirstyjhawker-hms/pay-it-sideways |
 | Demo | https://pay-it-sideways.grand-sugar.workers.dev |
 | Video | https://youtu.be/qk53Jla9X5g |
+| Skool post | https://www.skool.com/miniappscompetition/we-talk-about-paying-it-forward-but-what-about-paying-it-sideways?p=0efb3e0f |
+| Public social post | https://x.com/KHDigitalStudio/status/2095202596390678874/photo/1 |
 | GitHub login | `kirstyjhawker-hms` |
 | X account | https://x.com/KHDigitalStudio |
 | Contact email | Entered in the submission portal; not duplicated here |
@@ -22,9 +24,9 @@ Pay It Sideways begins with a three-beat story: think of one person, send one pr
 
 A sender answers two simple prompts, then sends their own genuine words. They can optionally add a small NIM gift through Nimiq Pay, but “Words are enough” is the default and is treated as a complete experience. The sender never needs the recipient’s wallet address: one private link carries both the note and, when present, a one-use claimable NIM gift.
 
-The recipient sees the message, the calm promise that nothing is expected in return, and two choices: keep this kindness or pass it sideways. Keep claims an attached gift into an account they choose. Pass moves that exact gift directly into the next one-use private link alongside a fresh message—without routing it through the recipient’s wallet or Pay It Sideways.
+The recipient sees the message, the calm promise that nothing is expected in return, and two choices: keep this kindness or pass it sideways. Keep claims an attached gift into an account they choose. Pass moves that exact gift directly into the next one-use private link alongside a fresh message—without routing it through the recipient’s wallet or Pay It Sideways. They can also send one small private acknowledgement back, without revealing their identity or wallet.
 
-Anonymous chain totals show recipient links actually opened, notes created, words-only acts, and NIM attached across notes. A separate private trail lets the sender watch the ripple without seeing messages, identities, recipient choices, or wallet addresses. There are no leaderboards, streaks, guilt prompts, or “biggest giver” mechanics.
+Anonymous chain totals show recipient links actually opened, notes created, words-only acts, NIM introduced, and acknowledgements received. A separate private trail lets the sender watch the ripple without seeing messages, identities, recipient choices, or wallet addresses. Device-only recent links support resharing, trail watching, and recovery of an unclaimed gift. There are no leaderboards, streaks, guilt prompts, or “biggest giver” mechanics.
 
 Nimiq is integral to the addressless gift experience. Nimiq Pay confirms the funding transaction, while the complete private link lets the recipient claim to their chosen Nimiq account or relay the same gift link-to-link. Pay It Sideways never custodies funds or stores the gift key on its server.
 
@@ -40,7 +42,7 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - **A real need:** thank a friend, colleague, carer or quiet supporter privately without first asking for their wallet address or making kindness performative.
 - **Resilient by design:** funded drafts survive interruption; saves and claims are idempotent; failed link/trail loads can be retried; pending claims can be confirmed or safely rebroadcast.
 - **Repeat value:** device-only sent-link history and private sender trails let people revisit links and watch a chain grow without exposing recipients or messages.
-- **Proven beyond a demo:** 39 automated tests plus a real Mainnet three-device founder-gift journey covering Accept → Pass → Keep with 5,000 NIM.
+- **Proven beyond a demo:** 40 automated tests plus a real Mainnet three-device founder-gift journey covering Accept → Pass → Keep with 5,000 NIM.
 
 ### Nimiq integration
 
@@ -83,7 +85,7 @@ Crypto gifting normally begins with plumbing: “What is your wallet address?”
 - [x] Claimable link requires no recipient address
 - [x] Funding and claim records are verified against the blockchain
 - [x] Mobile widths, tap targets, focus states, and reduced motion checked
-- [x] 39 unit/Worker-D1 integration tests, type checks, production build, and dependency audit pass
+- [x] 40 unit/Worker-D1 integration tests, type checks and production build pass
 - [x] Real Mainnet three-device founder-gift Accept → link-to-link Pass → Keep completed with 5,000 NIM
 - [x] Cloudflare authentication, D1 creation/migration, and production deployment
 - [x] Public GitHub repository published and URL inserted above

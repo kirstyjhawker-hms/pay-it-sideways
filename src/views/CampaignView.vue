@@ -26,7 +26,8 @@ const busy = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const isInsideNimiqPay = Boolean(window.nimiqPay)
-const openInNimiqPayUrl = nimiqPayDeepLink(window.location.href)
+const privateSetupDeepLink = nimiqPayDeepLink(window.location.href)
+const publicCampaignDeepLink = nimiqPayDeepLink(new URL('/first-kindness', window.location.origin).toString())
 
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
@@ -164,21 +165,35 @@ async function acceptKindness(): Promise<void> {
       <p class="privacy-note">Maximum campaign funding: 100,000 NIM. Each gift link is encrypted on this device before upload; the server cannot open or spend it. Never share this setup URL.</p>
       <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
       <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
-      <a v-if="!isInsideNimiqPay && campaignToken" class="button button--primary button--wide" :href="openInNimiqPayUrl">Open in Nimiq Pay to fund <span aria-hidden="true">↗</span></a>
+      <a v-if="!isInsideNimiqPay && campaignToken" class="button button--primary button--wide" :href="privateSetupDeepLink">Open in Nimiq Pay to fund <span aria-hidden="true">↗</span></a>
       <p v-if="!isInsideNimiqPay && campaignToken" class="fresh-act-note">This securely carries the complete private founder link into Nimiq Pay.</p>
       <button v-else class="button button--primary button--wide" type="button" :disabled="busy || !campaignToken || !status?.enabled || status.funded >= status.capacity" @click="fundNext">
         {{ busy ? 'Preparing this pot…' : status?.funded === status?.capacity ? 'All twenty are funded' : 'Fund next 5,000 NIM pot' }}
       </button>
     </section>
     <section v-else class="flow-card campaign-welcome" aria-labelledby="campaign-title">
+      <div class="campaign-gift-scene" aria-hidden="true">
+        <span class="campaign-gift-scene__heart">♥</span>
+        <div class="campaign-gift-scene__note"><i>♥</i><span>A little kindness,<br>saved for you.</span></div>
+        <span class="campaign-gift-scene__trail">· ♥ · ♥ ·</span>
+      </div>
       <p class="eyebrow">One of the first kindness chains</p>
-      <h1 id="campaign-title">Accept some kindness.</h1>
-      <p class="lead">As a thank-you for helping begin Pay It Sideways, up to twenty private kindness pots are being prepared. If one reaches you, keep it—or pass the same gift onwards with a message of your own.</p>
-      <div v-if="status" class="campaign-meter"><strong>{{ status.remaining }}</strong><span>funded pots waiting</span></div>
+      <h1 id="campaign-title">{{ status?.remaining === 0 ? 'All founder gifts are currently reserved.' : 'Someone saved a little kindness for you.' }}</h1>
+      <p v-if="status?.remaining === 0" class="lead">The twenty funded gifts have been reserved by Nimiq Pay devices. You can still send a private words-only kindness note—always free.</p>
+      <p v-else class="lead">Open a private note created to brighten your day. A founder-funded NIM gift comes with it; keep it, or send the same gift onwards with words of your own.</p>
+      <div v-if="status" class="campaign-meter"><strong>{{ status.remaining }}</strong><span>kindness gifts still waiting</span></div>
       <p class="pass-explainer"><strong>No purchase. No deposit. No referral.</strong> One gift per Nimiq Pay device while funded pots remain. NIM is a cryptoasset and its value can change.</p>
       <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
-      <a v-if="!isInsideNimiqPay && campaignToken && status?.enabled && status.remaining > 0" class="button button--primary button--wide" :href="openInNimiqPayUrl">Open in Nimiq Pay to accept <span aria-hidden="true">↗</span></a>
-      <p v-if="!isInsideNimiqPay && campaignToken && status?.enabled && status.remaining > 0" class="fresh-act-note">Nimiq Pay is needed only to reserve one gift for this device. No purchase or wallet address is required.</p>
+      <div v-if="!isInsideNimiqPay && campaignToken && status?.enabled && status.remaining > 0" class="app-required-note">
+        <strong>To receive this free 5,000 NIM gift, you’ll need the free Nimiq Pay app.</strong>
+        <span>No purchase, deposit, existing crypto or wallet address is required.</span>
+      </div>
+      <a v-if="!isInsideNimiqPay && campaignToken && status?.enabled && status.remaining > 0" class="button button--primary button--wide" :href="publicCampaignDeepLink">I have Nimiq Pay — open my gift <span aria-hidden="true">↗</span></a>
+      <div v-if="!isInsideNimiqPay && campaignToken && status?.enabled && status.remaining > 0" class="app-store-links" aria-label="Download Nimiq Pay">
+        <a class="button button--secondary button--wide" href="https://apps.apple.com/gb/app/nimiq-pay/id6471844738" target="_blank" rel="noopener">Get Nimiq Pay for iPhone <span aria-hidden="true">↗</span></a>
+        <a class="button button--secondary button--wide" href="https://play.google.com/store/apps/details?id=com.nimiq.pay" target="_blank" rel="noopener">Get Nimiq Pay for Android <span aria-hidden="true">↗</span></a>
+      </div>
+      <p v-if="!isInsideNimiqPay && campaignToken && status?.enabled && status.remaining > 0" class="fresh-act-note">Install it, then return to this page and tap “I have Nimiq Pay”.</p>
       <button v-else class="button button--primary button--wide" type="button" :disabled="busy || !campaignToken || !status?.enabled || status.remaining === 0" @click="acceptKindness">
         {{ busy
           ? 'Reserving your kindness…'
@@ -187,8 +202,8 @@ async function acceptKindness(): Promise<void> {
             : status?.remaining === 0 && status.funded < status.capacity
               ? 'More pots may be added soon'
               : status?.remaining === 0
-                ? 'All twenty journeys have begun'
-                : 'Accept the kindness' }}
+                ? 'All twenty gifts are reserved'
+                : 'Open your kindness' }}
       </button>
       <RouterLink class="text-link" to="/create">Send words instead—always free</RouterLink>
     </section>

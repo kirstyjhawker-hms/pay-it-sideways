@@ -6,6 +6,14 @@ export interface ChainStats {
   position: number
 }
 
+export type PrivateAcknowledgement = 'made-me-smile' | 'needed-this' | 'thank-you'
+
+export interface AcknowledgementCounts {
+  madeMeSmile: number
+  neededThis: number
+  thankYou: number
+}
+
 export interface SidewaysResponse {
   sideways: {
     reason: string
@@ -22,6 +30,7 @@ export interface SidewaysResponse {
     claimPending: boolean
     claimed: boolean
     kept: boolean
+    acknowledgement: PrivateAcknowledgement | null
   }
   chain: ChainStats
 }
@@ -37,5 +46,6 @@ export interface TrailResponse {
     nimGiftCount: number
     startedAt: string
     lastContinuedAt: string
+    acknowledgements: AcknowledgementCounts
   }
 }

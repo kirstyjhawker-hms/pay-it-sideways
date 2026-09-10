@@ -14,6 +14,7 @@ describe('Nimiq Pay deep links', () => {
   it('rejects non-web schemes', () => {
     expect(() => nimiqPayDeepLink('javascript:alert(1)')).toThrow('Only web links')
   })
+
 })
 
 describe('Nimiq readiness', () => {

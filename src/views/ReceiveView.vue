@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { broadcastGiftClaim, confirmGiftClaim, getGiftState, getSideways, keepSideways, reportSideways } from '../lib/api'
-import type { SidewaysResponse } from '../types'
+import { acknowledgeSideways, broadcastGiftClaim, confirmGiftClaim, getGiftState, getSideways, keepSideways, reportSideways } from '../lib/api'
+import type { PrivateAcknowledgement, SidewaysResponse } from '../types'
 import KindnessTrail from '../components/KindnessTrail.vue'
 import { track } from '../lib/analytics'
 import { createClaimTransaction, giftSecretFromHash } from '../lib/gift'
@@ -17,6 +17,7 @@ const loading = ref(true)
 const errorMessage = ref('')
 const keeping = ref(false)
 const kept = ref(false)
+const recovered = ref(false)
 const claimingFor = ref<'keep' | 'pass' | null>(null)
 const giftBalance = ref<number | null>()
 const giftBlockNumber = ref<number | null>()
@@ -35,12 +36,23 @@ const giftSecret = computed(() => {
 const isInsideNimiqPay = Boolean(window.nimiqPay)
 const openInNimiqPayUrl = nimiqPayDeepLink(window.location.href)
 const openedTracked = ref(false)
+const acknowledging = ref(false)
+const acknowledgement = ref<PrivateAcknowledgement>()
+const acknowledgementOptions: Array<{ value: PrivateAcknowledgement; label: string }> = [
+  { value: 'made-me-smile', label: 'This made me smile' },
+  { value: 'needed-this', label: 'I needed this today' },
+  { value: 'thank-you', label: 'Thank you 💛' },
+]
 
 const isClaimableGift = computed(() => data.value?.sideways.paymentMode === 'claimable')
 const needsGiftClaim = computed(() => isClaimableGift.value && !data.value?.sideways.claimed)
-const keepLabel = computed(() => needsGiftClaim.value
-  ? `Claim ${data.value?.sideways.paymentAmount} NIM & keep this`
-  : t('keep'))
+const isRecovery = computed(() => route.query.reclaim === '1')
+const keepLabel = computed(() => {
+  if (isRecovery.value && needsGiftClaim.value) return `Reclaim ${data.value?.sideways.paymentAmount} NIM to my account`
+  return needsGiftClaim.value
+    ? `Claim ${data.value?.sideways.paymentAmount} NIM & keep this`
+    : t('keep')
+})
 const giftIsReady = computed(() => {
   const amount = data.value?.sideways.paymentAmount
   return typeof giftBalance.value === 'number'
@@ -54,11 +66,12 @@ async function loadSideways(): Promise<void> {
   errorMessage.value = ''
   try {
     data.value = await getSideways(token.value)
-    if (!openedTracked.value) {
+    if (!isRecovery.value && !openedTracked.value) {
       track('recipient_opened')
       openedTracked.value = true
     }
     kept.value = data.value.sideways.kept
+    acknowledgement.value = data.value.sideways.acknowledgement ?? undefined
     reported.value = data.value.sideways.reported
     if (data.value.sideways.paymentMode === 'claimable' && !data.value.sideways.claimed) {
       await refreshGiftBalance()
@@ -71,6 +84,22 @@ async function loadSideways(): Promise<void> {
 }
 
 onMounted(loadSideways)
+
+async function acknowledge(value: PrivateAcknowledgement): Promise<void> {
+  if (acknowledging.value) return
+  acknowledging.value = true
+  errorMessage.value = ''
+  try {
+    await acknowledgeSideways(token.value, value)
+    acknowledgement.value = value
+    if (data.value) data.value.sideways.acknowledgement = value
+    track('recipient_acknowledged')
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'We could not send that private response just now.'
+  } finally {
+    acknowledging.value = false
+  }
+}
 
 async function refreshGiftBalance(): Promise<void> {
   checkingGift.value = true
@@ -203,6 +232,10 @@ async function claimGift(recipient?: string): Promise<'claimed' | 'selecting' | 
 
 async function finishAction(action: 'keep' | 'pass'): Promise<void> {
   if (action === 'keep') {
+    if (isRecovery.value) {
+      recovered.value = true
+      return
+    }
     await keepSideways(token.value)
     kept.value = true
     track('recipient_kept')
@@ -313,10 +346,6 @@ async function report(): Promise<void> {
           <p class="receive-kicker">Someone sent some kindness your way <span aria-hidden="true">💛</span></p>
           <h1 id="receive-title">“{{ data.sideways.message }}”</h1>
         </template>
-        <div v-if="!reported" class="reason-block">
-          <span>Why you came to mind</span>
-          <p>{{ data.sideways.reason }}</p>
-        </div>
         <div v-if="data.sideways.includesPayment" class="payment-received">
           <span class="nim-symbol" aria-hidden="true">N</span>
           <div>
@@ -339,6 +368,16 @@ async function report(): Promise<void> {
         <p class="no-obligation">There is nothing you need to do in return.</p>
       </section>
 
+      <section v-if="!reported && !isRecovery" class="acknowledgement-card" aria-labelledby="acknowledgement-title">
+        <p class="eyebrow">Optional private reply</p>
+        <h2 id="acknowledgement-title">Let them know it landed?</h2>
+        <p>The sender can see only this response in their private trail—not your identity, wallet or any new message.</p>
+        <div class="acknowledgement-options">
+          <button v-for="option in acknowledgementOptions" :key="option.value" type="button" :disabled="acknowledging" :class="{ selected: acknowledgement === option.value }" :aria-pressed="acknowledgement === option.value" @click="acknowledge(option.value)">{{ option.label }}</button>
+        </div>
+        <p v-if="acknowledgement" class="acknowledgement-sent" aria-live="polite">Sent privately. You can change your response if you wish.</p>
+      </section>
+
       <section v-if="selectingAccount" class="flow-card account-picker" aria-labelledby="account-title">
         <p class="eyebrow">Choose where it goes</p>
         <h2 id="account-title" ref="accountPickerTitle" tabindex="-1">Claim into which Nimiq account?</h2>
@@ -358,24 +397,38 @@ async function report(): Promise<void> {
         </div>
       </section>
 
-      <section v-if="!kept && !selectingAccount" class="receive-actions" aria-label="What would you like to do?">
-        <p v-if="isClaimableGift" class="pass-explainer"><strong>No NIM to buy.</strong> Choose Keep to claim this gift into your account, or pass it so this exact NIM moves straight into the next private link. Passing needs no wallet and none of your own NIM. Pay It Sideways never takes custody.</p>
+      <section v-if="recovered" class="kept-card" aria-live="polite">
+        <span aria-hidden="true">✓</span>
+        <div>
+          <strong>This unclaimed gift has been recovered.</strong>
+          <p>The {{ data.sideways.paymentAmount }} NIM was moved into the Nimiq account you selected. It was not recorded as a recipient keeping the kindness.</p>
+        </div>
+      </section>
+
+      <section v-if="!kept && !recovered && !selectingAccount" class="receive-actions" aria-label="What would you like to do?">
+        <p v-if="isRecovery" class="pass-explainer"><strong>Sender recovery.</strong> This moves an unclaimed bearer gift into an account you select. Only continue if you created and funded this private link.</p>
+        <p v-else-if="isClaimableGift" class="pass-explainer"><strong>No NIM to buy.</strong> Choose Keep to claim this gift into your account, or pass it so this exact NIM moves straight into the next private link. Passing needs no wallet and none of your own NIM. Pay It Sideways never takes custody.</p>
         <a v-if="needsGiftClaim && !isInsideNimiqPay" class="button button--primary button--wide" :href="openInNimiqPayUrl">
-          Open in Nimiq Pay to keep it <span aria-hidden="true">↗</span>
+          {{ isRecovery ? 'Open in Nimiq Pay to reclaim it' : 'Open in Nimiq Pay to keep it' }} <span aria-hidden="true">↗</span>
         </a>
         <p v-if="needsGiftClaim && !isInsideNimiqPay" class="fresh-act-note">This opens the same private link—including its gift key—inside Nimiq Pay. You will still choose the account and approve the claim.</p>
+        <div v-if="needsGiftClaim && !isInsideNimiqPay" class="app-store-inline" aria-label="Download Nimiq Pay">
+          <span>Don’t have Nimiq Pay?</span>
+          <a href="https://apps.apple.com/gb/app/nimiq-pay/id6471844738" target="_blank" rel="noopener">Get it for iPhone <span aria-hidden="true">↗</span></a>
+          <a href="https://play.google.com/store/apps/details?id=com.nimiq.pay" target="_blank" rel="noopener">Get it for Android <span aria-hidden="true">↗</span></a>
+        </div>
         <button v-else class="button button--primary button--wide" type="button" :disabled="keeping" @click="keep">
           {{ claimingFor === 'keep' ? 'Claiming your kindness…' : keepLabel }}
         </button>
-        <button class="button button--secondary button--wide" type="button" :disabled="Boolean(claimingFor)" @click="passSideways">
+        <button v-if="!isRecovery" class="button button--secondary button--wide" type="button" :disabled="Boolean(claimingFor)" @click="passSideways">
           <template v-if="claimingFor === 'pass'">Preparing the next kindness…</template>
           <template v-else>{{ isClaimableGift ? 'Pass this gift forward' : 'Pass it sideways—words or optional NIM' }} <span aria-hidden="true">↗</span></template>
         </button>
-        <p v-if="isClaimableGift" class="fresh-act-note">Use this button to make a fresh private link for the next person. Don’t forward this page’s URL.</p>
-        <p v-if="!needsGiftClaim" class="fresh-act-note">{{ t('freshNote') }}</p>
+        <p v-if="isClaimableGift && !isRecovery" class="fresh-act-note">Use this button to make a fresh private link for the next person. Don’t forward this page’s URL.</p>
+        <p v-if="!needsGiftClaim && !isRecovery" class="fresh-act-note">{{ t('freshNote') }}</p>
       </section>
 
-      <section v-else-if="!selectingAccount" class="receive-actions">
+      <section v-else-if="!selectingAccount && !isRecovery" class="receive-actions">
         <button class="button button--secondary button--wide" type="button" :disabled="Boolean(claimingFor)" @click="passSideways">
           Pass some kindness whenever you’re ready <span aria-hidden="true">↗</span>
         </button>

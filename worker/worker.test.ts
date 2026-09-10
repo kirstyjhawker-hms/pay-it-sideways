@@ -154,6 +154,11 @@ describe('Worker API', () => {
       chain: { linksOpened: 1, messageOnlyPasses: 1, position: 1 },
     })
 
+    const acknowledged = await dispatch(`/api/sideways/${token}/acknowledge`, post({ acknowledgement: 'needed-this' }))
+    expect(acknowledged.status).toBe(200)
+    expect(await acknowledged.json()).toEqual({ acknowledgement: 'needed-this' })
+    expect((await dispatch(`/api/sideways/${token}/acknowledge`, post({ acknowledgement: 'free text is not allowed' }))).status).toBe(422)
+
     expect((await dispatch(`/api/sideways/${token}/keep`, post())).status).toBe(200)
 
     const childToken = 'E'.repeat(43)
@@ -180,6 +185,7 @@ describe('Worker API', () => {
         messageOnlyPasses: 2,
         nimGiftCount: 0,
         nimPassed: 0,
+        acknowledgements: { madeMeSmile: 0, neededThis: 1, thankYou: 0 },
       },
     })
     const trailText = await (await dispatch(`/api/trails/${trailToken}`)).text()

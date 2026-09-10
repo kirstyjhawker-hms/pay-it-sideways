@@ -37,11 +37,26 @@ onMounted(async () => {
 
 <template>
   <main class="screen home-screen">
-    <div class="path-art" aria-hidden="true">
-      <i></i><i></i><i></i>
-    </div>
-
     <section class="home-copy" aria-labelledby="home-heading">
+      <div class="kindness-scene">
+        <video
+          class="kindness-scene__video"
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="metadata"
+          poster="/care-travels-poster.jpg"
+          aria-hidden="true"
+        >
+          <source src="/care-travels-hero.mp4" type="video/mp4">
+        </video>
+        <div class="kindness-scene__caption">
+          <span aria-hidden="true">💛</span>
+          <p>{{ t('visualNoteFrom') }}</p>
+        </div>
+      </div>
+
       <p class="eyebrow">{{ t('homeEyebrow') }}</p>
       <h1 id="home-heading">{{ t('homeTitle') }}</h1>
       <p class="lead">
@@ -49,17 +64,24 @@ onMounted(async () => {
       </p>
       <p class="audience-note">{{ t('homeAudience') }}</p>
 
+      <RouterLink class="button button--primary button--wide home-primary-cta" to="/create" @click="track('create_started')">
+        {{ t('start') }} <span aria-hidden="true">→</span>
+      </RouterLink>
+      <a v-if="!isInsideNimiqPay" class="button button--secondary button--wide home-wallet-link" :href="openInNimiqPayUrl">
+        Open in Nimiq Pay to include NIM <span aria-hidden="true">↗</span>
+      </a>
+
       <ol class="story-beats" aria-label="How Pay It Sideways works">
         <li>
-          <span class="story-number" aria-hidden="true">1</span>
+          <span class="story-number" aria-hidden="true">💭</span>
           <div><strong>{{ t('thinkTitle') }}</strong><p>{{ t('thinkBody') }}</p></div>
         </li>
         <li>
-          <span class="story-number" aria-hidden="true">2</span>
+          <span class="story-number" aria-hidden="true">💌</span>
           <div><strong>{{ t('linkTitle') }}</strong><p>{{ t('linkBody') }}</p></div>
         </li>
         <li>
-          <span class="story-number" aria-hidden="true">3</span>
+          <span class="story-number" aria-hidden="true">💛</span>
           <div><strong>{{ t('chooseTitle') }}</strong><p>{{ t('chooseBody') }}</p></div>
         </li>
       </ol>
@@ -73,13 +95,6 @@ onMounted(async () => {
         </a>
         <small>{{ t('founderNote') }}</small>
       </aside>
-
-      <RouterLink class="button button--primary button--wide" to="/create" @click="track('create_started')">
-        {{ t('start') }} <span aria-hidden="true">→</span>
-      </RouterLink>
-      <a v-if="!isInsideNimiqPay" class="button button--secondary button--wide home-wallet-link" :href="openInNimiqPayUrl">
-        Open in Nimiq Pay to include NIM <span aria-hidden="true">↗</span>
-      </a>
       <RouterLink v-if="hasSentLinks" class="recent-link" to="/history">{{ t('recent') }}</RouterLink>
 
       <div class="quiet-status" role="status" aria-live="polite">

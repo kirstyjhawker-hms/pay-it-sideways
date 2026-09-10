@@ -48,6 +48,8 @@ interface SidewaysRow {
   status: string
   kept_at: string | null
   first_opened_at: string | null
+  acknowledgement: 'made-me-smile' | 'needed-this' | 'thank-you' | null
+  acknowledged_at: string | null
 }
 
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8' }
@@ -60,6 +62,7 @@ const allowedEvents = new Set([
   'share_started',
   'recipient_opened',
   'recipient_kept',
+  'recipient_acknowledged',
   'continuation_started',
   'continuation_completed',
   'message_only_used',
@@ -260,6 +263,9 @@ interface ChainStatsRow {
   nim_passed_luna: number
   started_at: string
   last_continued_at: string
+  made_me_smile: number
+  needed_this: number
+  thank_you: number
 }
 
 async function getChainStats(chainId: string, env: Env): Promise<ChainStatsRow | null> {
@@ -280,7 +286,10 @@ async function getChainStats(chainId: string, env: Env): Promise<ChainStatsRow |
         ELSE 0
       END), 0) AS nim_passed_luna,
       MIN(s.created_at) AS started_at,
-      MAX(s.created_at) AS last_continued_at
+      MAX(s.created_at) AS last_continued_at,
+      SUM(CASE WHEN s.acknowledgement = 'made-me-smile' THEN 1 ELSE 0 END) AS made_me_smile,
+      SUM(CASE WHEN s.acknowledgement = 'needed-this' THEN 1 ELSE 0 END) AS needed_this,
+      SUM(CASE WHEN s.acknowledgement = 'thank-you' THEN 1 ELSE 0 END) AS thank_you
     FROM sideways s
     INNER JOIN consents c ON c.sideways_id = s.id
     LEFT JOIN sideways parent ON parent.id = s.parent_id
@@ -437,7 +446,7 @@ async function getSideways(token: string, env: Env): Promise<Response> {
       payment_luna,
       transaction_hash, payment_mode, payment_network, gift_address,
       claim_transaction_hash, pending_claim_transaction_hash, claimed_at, status, kept_at,
-      first_opened_at
+      first_opened_at, acknowledgement, acknowledged_at
     FROM sideways WHERE recipient_token_hash = ?
   `).bind(hash).first<SidewaysRow>()
 
@@ -474,6 +483,7 @@ async function getSideways(token: string, env: Env): Promise<Response> {
       claimPending: Boolean(sideways.pending_claim_transaction_hash),
       claimed: Boolean(sideways.claimed_at),
       kept: Boolean(sideways.kept_at),
+      acknowledgement: sideways.acknowledgement,
     },
     chain: {
       linksOpened: Number(stats?.links_opened ?? 1),
@@ -504,8 +514,36 @@ async function getTrail(token: string, env: Env): Promise<Response> {
       nimPassed: Number(stats.nim_passed_luna) / 100_000,
       startedAt: stats.started_at,
       lastContinuedAt: stats.last_continued_at,
+      acknowledgements: {
+        madeMeSmile: Number(stats.made_me_smile ?? 0),
+        neededThis: Number(stats.needed_this ?? 0),
+        thankYou: Number(stats.thank_you ?? 0),
+      },
     },
   })
+}
+
+const acknowledgementValues = new Set(['made-me-smile', 'needed-this', 'thank-you'])
+
+async function acknowledgeSideways(request: Request, token: string, env: Env): Promise<Response> {
+  let acknowledgement: unknown
+  try {
+    const body = await readSmallJson<{ acknowledgement?: unknown }>(request, 1024)
+    acknowledgement = body.acknowledgement
+  } catch {
+    return json({ error: 'That private response could not be read.' }, 400)
+  }
+  if (typeof acknowledgement !== 'string' || !acknowledgementValues.has(acknowledgement)) {
+    return json({ error: 'Choose one of the available private responses.' }, 422)
+  }
+  const hash = await tokenHash(token)
+  const result = await env.DB.prepare(`
+    UPDATE sideways
+    SET acknowledgement = ?, acknowledged_at = COALESCE(acknowledged_at, ?)
+    WHERE recipient_token_hash = ? AND status = 'delivered'
+  `).bind(acknowledgement, new Date().toISOString(), hash).run()
+  if (!result.meta.changes) return json({ error: 'This kindness link could not be found.' }, 404)
+  return json({ acknowledgement })
 }
 
 async function getGiftBalance(token: string, env: Env): Promise<Response> {
@@ -964,6 +1002,12 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === 'POST' && keepToken) {
     const limited = await enforceRateLimit(request, env, 'keep', 60, 3_600)
     return limited || keepSideways(keepToken, env)
+  }
+
+  const acknowledgementToken = tokenFromPath(url.pathname, 'acknowledge')
+  if (request.method === 'POST' && acknowledgementToken) {
+    const limited = await enforceRateLimit(request, env, 'acknowledge', 30, 3_600)
+    return limited || acknowledgeSideways(request, acknowledgementToken, env)
   }
 
   const balanceToken = tokenFromPath(url.pathname, 'gift-balance')

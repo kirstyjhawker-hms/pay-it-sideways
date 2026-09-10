@@ -10,7 +10,7 @@ onMounted(() => track('app_open'))
   <div class="app-shell">
     <header class="topbar">
       <RouterLink class="brand" to="/" aria-label="Pay It Sideways home">
-        <span class="brand-mark" aria-hidden="true">↗</span>
+        <span class="brand-mark" aria-hidden="true"><b>♥</b><i>→</i></span>
         <span>Pay It Sideways</span>
       </RouterLink>
     </header>
